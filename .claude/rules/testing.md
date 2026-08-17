@@ -1,0 +1,5 @@
+- Test domain rules (RN-001 to RN-014) in isolation, without infrastructure (no RabbitMQ, no PostgreSQL, no Azure SDKs).
+- Event consumers must be tested for idempotency and for retry/redelivery scenarios (at-least-once delivery from RabbitMQ + Outbox, ADR-009).
+- gRPC contracts (`contracts/`) require contract tests, not only unit tests of the implementation (RNF-006, ADR-003).
+- Priority calculation (impacto × urgencia → P1–P4, RN-012) needs a dedicated test matrix covering all 16 combinations.
+- Do not assert against invented SLA/KPI numeric targets that are marked as pending in `docs/operations/sla-kpi.md`.

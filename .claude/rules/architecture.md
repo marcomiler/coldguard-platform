@@ -1,0 +1,8 @@
+- Use REST only at the external edge (ADR-008: Gateway).
+- Use gRPC for internal synchronous communication (ADR-003).
+- Use asynchronous events for cross-service workflows (ADR-004, ADR-005).
+- Keep domain logic independent of RabbitMQ and Azure SDKs (ports and adapters).
+- Do not bypass the Gateway from the frontend.
+- Do not access another service's tables directly; each service owns its schema (ADR-006).
+- Reliable event publishing goes through the Transactional Outbox (ADR-009), not direct broker calls after commit.
+- Any new cross-service architectural decision requires a new ADR before implementation, not a silent choice in code.

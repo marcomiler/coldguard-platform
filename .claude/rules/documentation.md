@@ -1,0 +1,7 @@
+- Never reuse, renumber or delete an existing ID (RF-, RN-, CU-, R-, ADR-, evento). New items get the next free number.
+- Every new functional requirement (RF) must reference the use case(s) (CU) and business rule(s) (RN) it supports.
+- Every new use case (CU) must reference its RF, related RN, and the event(s) it emits or consumes, when applicable.
+- Do not add functionality outside the MVP scope declared in `docs/academic/01-propuesta-proyecto.md` and `docs/business/business-analysis.md`.
+- Every ADR follows the same 8 sections, in this order: Contexto, Problema, Opciones consideradas, Decisión, Consecuencias, Riesgos, Related ADRs, Evolución futura a Azure.
+- A change to `docs/architecture/c4.md` or `docs/architecture/events.md` that reflects an unresolved architectural ambiguity must be backed by an ADR, not a silent diagram edit.
+- Numeric SLA/KPI targets that are not confirmed by the business must be marked explicitly as pending/academic placeholder, never invented.

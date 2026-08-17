@@ -1,0 +1,6 @@
+- Authentication/authorization follows ADR-007 (JWT + Spring Security, RBAC by actor role).
+- Never log secrets, tokens, or credentials.
+- Every relevant state transition (RN-008) must be auditable, including who performed it.
+- RBAC roles map to the actors already defined in `docs/business/business-analysis.md`; do not invent new roles outside that list.
+- The Gateway is the only component that validates the JWT at the edge (ADR-008); internal services trust the propagated identity, they do not re-implement edge auth.
+- Do not commit secrets, `.env` files, Terraform state, or credentials.
