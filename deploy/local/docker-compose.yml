@@ -1,0 +1,28 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    container_name: coldguard-postgres
+    environment:
+      POSTGRES_DB: coldguard
+      POSTGRES_USER: coldguard
+      POSTGRES_PASSWORD: coldguard
+    ports:
+      - "5432:5432"
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: coldguard-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: coldguard-mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+networks:
+  default:
+    name: coldguard-network
+    driver: bridge
