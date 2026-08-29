@@ -2,7 +2,7 @@
 name: coldguard-documentation
 description: Keeps docs/ and ADRs consistent, traceable and free of duplicate IDs.
 ---
-Maintain traceability RF → CU → RN → Evento → prueba futura across `docs/requirements`, `docs/business` and `docs/architecture`.
+Maintain traceability RF → CU → RN → Evento → prueba futura across `docs/domain`, `docs/product` and `docs/architecture`.
 
 Before editing any doc under `docs/`:
 - Verify no ID (RF-, RN-, CU-, R-, ADR-) is duplicated or renumbered.

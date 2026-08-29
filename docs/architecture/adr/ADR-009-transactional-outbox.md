@@ -1,7 +1,7 @@
 # ADR-009 Publicación confiable de eventos mediante Transactional Outbox
 
 ## Contexto
-El modelo de eventos (`docs/architecture/events.md`) es central para los workflows cross-service (`TelemetryThresholdBreached`, `IncidentCreated`, `IncidentAcknowledged`, `IncidentEscalated`, `IncidentClosed`, `NotificationRequested`, `NotificationFailed`), y ADR-005 decide que Incident Service → Notification Service se comunican por evento. CLAUDE.md exige "evitar transacciones distribuidas" y "preferir consistencia eventual". Quedó registrado como riesgo R-009.
+El modelo de eventos (`docs/domain/commands-events.md`) es central para los workflows cross-service (`TelemetryThresholdBreached`, `IncidentCreated`, `IncidentAcknowledged`, `IncidentEscalated`, `IncidentClosed`, `NotificationRequested`, `NotificationFailed`), y ADR-005 decide que Incident Service → Notification Service se comunican por evento. CLAUDE.md exige "evitar transacciones distribuidas" y "preferir consistencia eventual". Quedó registrado como riesgo R-009.
 
 ## Problema
 ¿Cómo se garantiza que un servicio (ej. Incident Service) no pierda un evento cuando falla entre el commit de su transacción de base de datos y la publicación del mensaje en RabbitMQ, sin usar una transacción distribuida (2PC) entre PostgreSQL y RabbitMQ?
@@ -23,7 +23,7 @@ Se adopta la **opción 3**: Transactional Outbox para la publicación confiable 
 ## Riesgos
 - Si el poller de outbox falla o se detiene, los eventos se acumulan sin publicarse; requiere monitoreo (métricas de rezago de la tabla outbox).
 - Duplicados posibles en el borde (reintento de publicación) si el poller falla justo después de publicar pero antes de marcar como publicado; mitigado por idempotencia en consumidores.
-- Complejidad adicional en el MVP académico: debe evaluarse el esfuerzo de implementación frente al alcance de los sprints definidos en `docs/operations/sprints.md`.
+- Complejidad adicional en el MVP académico: debe evaluarse el esfuerzo de implementación frente al alcance de los sprints definidos en `docs/planning/roadmap.md`.
 
 ## Related ADRs
 - ADR-004 (RabbitMQ es el broker destino de la publicación confiable descrita aquí).
@@ -31,4 +31,9 @@ Se adopta la **opción 3**: Transactional Outbox para la publicación confiable 
 - ADR-006 (la tabla `outbox` de cada servicio vive dentro de su propio esquema lógico).
 
 ## Evolución futura a Azure
-En una eventual migración cloud, el patrón Outbox se mantiene igual; solo cambia el destino de publicación (Azure Service Bus en vez de RabbitMQ, según ADR-004), y el poller puede evolucionar hacia Change Data Capture (CDC) nativo de Azure si se justifica. No se crean recursos Azure como parte de esta decisión; queda sujeta a aprobación explícita.
+**Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el
+aprovisionamiento y despliegue permanecen pendientes de ejecución. En esa migración, el patrón
+Outbox se mantiene igual; solo cambiaría el destino de publicación (ver ADR-004; sin selección de
+servicio concreto todavía), y el poller es candidato ilustrativo a evolucionar hacia una solución
+de Change Data Capture nativa de Azure si se justifica. No se crean recursos Azure como parte de
+esta decisión; queda sujeta a aprobación explícita.

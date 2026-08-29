@@ -1,8 +1,8 @@
-Help plan or update one sprint in `docs/operations/sprints.md`.
+Help plan or update one sprint in `docs/planning/roadmap.md`.
 
 Before proposing content:
-- Read the current sprint list and the risk register (`docs/operations/risk-register.md`), especially R-001 (alcance excesivo).
-- Read `docs/requirements/functional-requirements.md` and `docs/requirements/use-cases.md` to ground the sprint scope in already-defined RF/CU, not new ones.
+- Read the current sprint list and the risk register (`docs/quality/risk-register.md`), especially R-001 (alcance excesivo).
+- Read `docs/domain/functional-requirements.md` and `docs/domain/use-cases.md` to ground the sprint scope in already-defined RF/CU, not new ones.
 - Check whether the proposed sprint content depends on an architectural decision that still lacks an ADR; if so, flag it instead of assuming a resolution.
 
 When proposing sprint content:

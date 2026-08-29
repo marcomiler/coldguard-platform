@@ -2,7 +2,7 @@
 name: coldguard-domain
 description: Applies domain terminology, business rules, requirements and use cases.
 ---
-Use canonical terms from `docs/business` and `docs/requirements`. Do not invent capabilities outside the MVP.
+Use canonical terms from `docs/product` and `docs/domain`. Do not invent capabilities outside the MVP.
 
 Key rules to respect:
 - Priority (P1–P4) always comes from the impacto/urgencia matrix (RN-012), never a direct severity→priority mapping (RN-013).

@@ -10,4 +10,9 @@ Productos sensibles pueden perderse por fallas térmicas, energía, apertura de 
 La plataforma recibe telemetría, evalúa perfiles operativos, detecta anomalías, crea incidentes priorizados, aplica SLA, notifica responsables y conserva evidencia auditable.
 
 ## Diferenciador
-Integra microservicios, gRPC, eventos, observabilidad, auditoría y una arquitectura cloud-ready sin depender de cloud en el MVP.
+ColdGuard transforma telemetría simulada en respuesta operativa trazable, priorizando incidentes
+y preservando evidencia para reducir el riesgo de reacción tardía.
+
+La arquitectura técnica que hace esto posible (microservicios, gRPC, eventos, observabilidad,
+auditoría, cloud-ready sin depender de cloud en el MVP) está detallada en
+`docs/product/vision.md` y `docs/architecture/tech-stack.md`.

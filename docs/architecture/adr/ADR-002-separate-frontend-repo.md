@@ -1,7 +1,7 @@
 # ADR-002 Frontend en repositorio separado
 
 ## Contexto
-CLAUDE.md declara explícitamente que el frontend pertenece al repositorio `coldguard-frontend`. El C4 (`docs/architecture/c4.md`) modela `FE[Frontend Repo]` como un contenedor externo que consume el Gateway del backend. ADR-001 ya define el monorepo backend.
+CLAUDE.md declara explícitamente que el frontend pertenece al repositorio `coldguard-frontend`. El C4 (`docs/architecture/container-diagram.md`) modela `FE[Frontend Repo]` como un contenedor externo que consume el Gateway del backend. ADR-001 ya define el monorepo backend.
 
 ## Problema
 ¿La capa de presentación debe vivir dentro del monorepo backend o en un repositorio propio, dado que tiene un stack, ciclo de entrega y dependencias distintos a los del backend?
@@ -28,4 +28,6 @@ La capa de presentación se desarrolla en un repositorio separado, `coldguard-fr
 - ADR-008 (Gateway como único punto de entrada REST consumido por el frontend).
 
 ## Evolución futura a Azure
-Sin impacto directo en esta decisión: el frontend puede desplegarse en un servicio de hosting estático o SSR (por ejemplo, Azure Static Web Apps) de forma independiente del backend, siempre que consuma el mismo contrato REST del Gateway. No se crean recursos Azure como parte de esta decisión.
+**Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el
+aprovisionamiento y despliegue permanecen pendientes de ejecución. Sin impacto directo en esta
+decisión: el frontend puede desplegarse en un servicio de hosting estático o SSR (por ejemplo, Azure Static Web Apps) de forma independiente del backend, siempre que consuma el mismo contrato REST del Gateway. No se crean recursos Azure como parte de esta decisión.

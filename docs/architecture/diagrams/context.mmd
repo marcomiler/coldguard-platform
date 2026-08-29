@@ -1,0 +1,21 @@
+%% C4 Nivel 1 — Contexto del sistema
+%% Fuente: docs/architecture/system-context.md (no editar aquí sin actualizar la fuente)
+flowchart LR
+  subgraph Actores["Actores humanos (vía coldguard-frontend)"]
+    Adm[Administrador de plataforma]
+    Sup[Supervisor de operaciones]
+    Op[Operador]
+    Tec[Técnico de mantenimiento]
+    Aud[Auditor]
+  end
+
+  Adm --> FE[coldguard-frontend]
+  Sup --> FE
+  Op --> FE
+  Tec --> FE
+  Aud --> FE
+
+  FE -->|REST| BE[ColdGuard Platform]
+  Sim[Sensor Simulator] -->|telemetría| BE
+  BE -->|notificación| Mail[Adaptador de notificaciones]
+  BE -->|logs, métricas, trazas| Obs[Observabilidad]

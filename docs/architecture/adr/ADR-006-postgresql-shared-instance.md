@@ -1,10 +1,10 @@
 # ADR-006 Estrategia de persistencia: una instancia PostgreSQL con ownership lógico por servicio
 
 ## Contexto
-El C4 (`docs/architecture/c4.md`) muestra Asset Service, Telemetry Service e Incident Service apuntando todos a `DB[(PostgreSQL)]`, sin especificar si es una instancia compartida sin aislamiento o instancias separadas. Quedó registrado como riesgo R-006.
+El C4 (`docs/architecture/container-diagram.md`) muestra Asset Service, Telemetry Service e Incident Service apuntando todos a `DB[(PostgreSQL)]`, sin especificar si es una instancia compartida sin aislamiento o instancias separadas. Quedó registrado como riesgo R-006.
 
 ## Problema
-¿Cómo se persisten los datos de cada servicio en el MVP, dado que CLAUDE.md exige "ports and adapters" y límites de servicio explícitos, pero el runbook local (`docs/operations/runbook-local.md`) solo levanta una dependencia PostgreSQL vía Docker Compose?
+¿Cómo se persisten los datos de cada servicio en el MVP, dado que CLAUDE.md exige "ports and adapters" y límites de servicio explícitos, pero el runbook local (`docs/operations/runbooks.md`) solo levanta una dependencia PostgreSQL vía Docker Compose?
 
 ## Opciones consideradas
 1. **Una instancia PostgreSQL por servicio** (contenedor propio por servicio): aislamiento fuerte, pero multiplica el consumo de recursos locales y la complejidad del `docker-compose.yml` para un MVP académico.
@@ -30,4 +30,20 @@ Se adopta la **opción 3**: una instancia PostgreSQL local, con ownership lógic
 - ADR-009 (la tabla de Outbox de cada servicio vive dentro de su propio esquema lógico, respetando este ownership).
 
 ## Evolución futura a Azure
-En una eventual migración cloud, cada esquema lógico es candidato a convertirse en una base de datos Azure Database for PostgreSQL independiente por servicio, sin cambios en el modelo de datos de cada servicio (ya que hoy no hay dependencias cruzadas de esquema). No se crean recursos Azure como parte de esta decisión; queda sujeta a aprobación explícita y a un ADR de migración posterior.
+**Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el
+aprovisionamiento y despliegue permanecen pendientes de ejecución. Ningún servicio Azure concreto
+de base de datos está seleccionado todavía: en esa migración, cada esquema lógico es candidato
+ilustrativo a convertirse en una base de datos administrada independiente por servicio, sin
+cambios en el modelo de datos de cada servicio (ya que hoy no hay dependencias cruzadas de
+esquema). No se crean recursos Azure como parte de esta decisión; queda sujeta a aprobación
+explícita y a un ADR de migración posterior.
+
+## Actualización posterior
+**Fecha por confirmar** (DEC-002, `docs/planning/decisions-log.md`).
+
+**Azure Database for PostgreSQL Flexible Server** queda confirmado como la plataforma planificada
+para PostgreSQL, precisando el candidato ilustrativo genérico de la sección anterior. Esto no
+cambia el modelo de ownership lógico de esquema por servicio decidido en este ADR (una instancia,
+sin joins/FK cruzados); Audit Log (DEC-005) sigue el mismo patrón: PostgreSQL compartido con
+ownership lógico de esquema propio, sin almacenamiento inmutable ni WORM. Ningún recurso Azure se
+crea como parte de esta actualización.

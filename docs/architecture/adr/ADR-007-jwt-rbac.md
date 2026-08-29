@@ -1,7 +1,7 @@
 # ADR-007 Autenticación y autorización: JWT con Spring Security y RBAC
 
 ## Contexto
-RNF-003 (`docs/requirements/non-functional-requirements.md`) exige "RBAC, autenticación y auditoría", pero ningún documento definía el mecanismo concreto. Quedó registrado como riesgo R-007. El stack del proyecto (CLAUDE.md) es Java 25 / Spring Boot.
+RNF-003 (`docs/quality/non-functional-requirements.md`) exige "RBAC, autenticación y auditoría", pero ningún documento definía el mecanismo concreto. Quedó registrado como riesgo R-007. El stack del proyecto (CLAUDE.md) es Java 25 / Spring Boot.
 
 ## Problema
 ¿Qué mecanismo de autenticación y autorización se usa en el MVP para cumplir RNF-003, siendo consistente con "REST at the edge, gRPC internally" y sin depender de un proveedor de identidad cloud (para no introducir dependencia de Azure en el MVP)?
@@ -12,11 +12,11 @@ RNF-003 (`docs/requirements/non-functional-requirements.md`) exige "RBAC, autent
 3. **OIDC delegado a un proveedor externo (ej. Azure AD/Entra ID)**: introduce dependencia cloud no aprobada para el MVP, contradice la política de "no Azure sin aprobación explícita".
 
 ## Decisión
-Se adopta la **opción 2**: JWT emitido y validado con Spring Security, con roles (RBAC) embebidos en el token, para autenticación y autorización en el MVP. Los roles reflejan los actores del dominio (Supervisor, Operador, Técnico de mantenimiento, Auditor, Administrador) definidos en `docs/business/business-analysis.md`.
+Se adopta la **opción 2**: JWT emitido y validado con Spring Security, con roles (RBAC) embebidos en el token, para autenticación y autorización en el MVP. Los roles reflejan los actores del dominio (Supervisor, Operador, Técnico de mantenimiento, Auditor, Administrador) definidos en `docs/product/stakeholders.md`.
 
 ## Consecuencias
 - El Gateway (ADR-008) es responsable de validar el JWT en el borde; los servicios internos confían en la identidad/roles propagados (vía metadata gRPC) o revalidan el token según se defina en implementación.
-- RBAC se aplica por caso de uso: cada CU de `docs/requirements/use-cases.md` queda asociado a un rol autorizado (a completar en la implementación, sin inventar roles nuevos fuera de los actores ya definidos).
+- RBAC se aplica por caso de uso: cada CU de `docs/domain/use-cases.md` queda asociado a un rol autorizado (a completar en la implementación, sin inventar roles nuevos fuera de los actores ya definidos).
 - Requiere una política de expiración/rotación de tokens y manejo seguro de la clave de firma (sin commitear secretos, regla ya vigente en CLAUDE.md).
 - La auditoría (RN-008) debe registrar el usuario/rol autenticado en cada transición relevante.
 
@@ -29,4 +29,25 @@ Se adopta la **opción 2**: JWT emitido y validado con Spring Security, con role
 - ADR-008 (el Gateway es responsable de validar el JWT emitido según esta decisión, en el borde del sistema).
 
 ## Evolución futura a Azure
-En una eventual migración cloud, la emisión de JWT puede delegarse a Azure AD/Entra ID (OIDC) sin cambiar el modelo de autorización basado en roles ya validado en el MVP, siempre que los claims de rol se mantengan compatibles. No se crean recursos Azure como parte de esta decisión; queda sujeta a aprobación explícita.
+**Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el
+aprovisionamiento y despliegue permanecen pendientes de ejecución. En esa migración, la emisión
+de JWT es candidata ilustrativa a delegarse a un proveedor de identidad de Azure (por ejemplo,
+Entra ID) sin cambiar el modelo de autorización basado en roles ya validado en el MVP, siempre
+que los claims de rol se mantengan compatibles; no hay una selección de servicio concreto
+todavía. No se crean recursos Azure como parte de esta decisión; queda sujeta a aprobación
+explícita.
+
+## Actualización posterior
+**Fecha por confirmar** (DEC-004, `docs/planning/decisions-log.md`).
+
+Un módulo o servicio lógico **Identity & Access** queda confirmado como dueño de usuarios, roles y
+asignaciones de acceso (RF-013/CU-014); no se asigna esta responsabilidad a Asset Service. Esto no
+cambia la decisión de este ADR: el Gateway sigue siendo el único componente que valida el JWT en
+el borde y propaga la identidad (ADR-008); Identity & Access es dueño de los datos de usuarios y
+roles, no del mecanismo de validación en el borde. La autenticación/autorización real de endpoints
+sigue perteneciendo a APF2 (RF-015/CU-016), sin cambio de fase.
+
+**Segunda actualización (DEC-008)**: Identity & Access se aloja como **módulo interno de Incident
+Service**, no como microservicio separado ni bajo arquitectura hexagonal formal. No cambia el
+ownership fijado arriba ni la responsabilidad del Gateway en el borde; cambia únicamente la forma
+de despliegue del módulo.

@@ -1,0 +1,18 @@
+%% C4 Nivel 2 — Contenedores
+%% Fuente: docs/architecture/container-diagram.md (no editar aquí sin actualizar la fuente)
+%% Prohibido dibujar una flecha directa Incident Service -> Notification Service (ADR-005, ADR-009).
+flowchart LR
+  FE[coldguard-frontend<br/>sistema externo] -->|REST| GW[Gateway]
+  GW -->|gRPC| AS[Asset Service]
+  GW -->|gRPC| IS["Incident Service<br/>(incluye módulos internos:<br/>Identity & Access, Audit Log,<br/>consultas operativas)"]
+  Simulator[Sensor Simulator] -->|gRPC, telemetría| TS[Telemetry Service]
+  Admin[Administrador de plataforma] -->|REST interno protegido, CU-015| TestEndpoint[Endpoint interno protegido de pruebas]
+  TestEndpoint --> TS
+  TS -->|gRPC, si aplica| IS
+  TS -->|SQL| DB[(PostgreSQL)]
+  AS -->|SQL| DB
+  IS -->|SQL, esquemas incident/identity/auditlog| DB
+  TS -->|AMQP, publica| MQ[RabbitMQ]
+  IS -->|AMQP, publica| MQ
+  MQ -->|AMQP, consume| NS[Notification Service]
+  NS -->|integración externa| Mail[Adaptador de notificaciones]

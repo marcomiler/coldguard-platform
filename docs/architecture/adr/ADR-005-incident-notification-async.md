@@ -1,7 +1,7 @@
 # ADR-005 Comunicación Incident Service → Notification Service mediante eventos
 
 ## Contexto
-El C4 (`docs/architecture/c4.md`) muestra una relación directa entre Incident Service y Notification Service, mientras que `docs/architecture/events.md` define `NotificationRequested` y `NotificationFailed` como eventos. Esta ambigüedad quedó registrada como riesgo R-005 en `docs/operations/risk-register.md`.
+El C4 (`docs/architecture/container-diagram.md`) muestra una relación directa entre Incident Service y Notification Service, mientras que `docs/domain/commands-events.md` define `NotificationRequested` y `NotificationFailed` como eventos. Esta ambigüedad quedó registrada como riesgo R-005 en `docs/quality/risk-register.md`.
 
 ## Problema
 ¿Cómo debe comunicarse Incident Service con Notification Service para disparar notificaciones (RF-008), sin acoplar el flujo de incidentes a la disponibilidad del canal de notificación (email vía Mailpit) ni violar la regla de "eventos para workflows cross-service" de CLAUDE.md?
@@ -17,7 +17,7 @@ Se adopta la **opción 2**: Incident Service → Notification Service se comunic
 ## Consecuencias
 - Notification Service puede fallar o estar caído sin bloquear la creación/escalación de incidentes.
 - Se requiere que los consumidores sean idempotentes (regla ya establecida en CLAUDE.md).
-- El C4 (`docs/architecture/c4.md`) debe actualizarse en una edición futura para reflejar `IS → MQ → NS` en vez de `IS → NS` directo.
+- El C4 (`docs/architecture/container-diagram.md`) debe actualizarse en una edición futura para reflejar `IS → MQ → NS` en vez de `IS → NS` directo.
 - La confiabilidad de la publicación del evento depende de ADR-009 (Transactional Outbox).
 
 ## Riesgos
@@ -31,4 +31,10 @@ Se adopta la **opción 2**: Incident Service → Notification Service se comunic
 - ADR-009 (Transactional Outbox garantiza la publicación confiable de `NotificationRequested`).
 
 ## Evolución futura a Azure
-En una eventual migración cloud, RabbitMQ es reemplazable por Azure Service Bus (ya anticipado en ADR-004) manteniendo el mismo contrato de eventos (`NotificationRequested`, `NotificationFailed`), sin cambios en la lógica de dominio de Incident Service ni Notification Service. No se crean recursos Azure como parte de esta decisión; queda sujeta a aprobación explícita.
+**Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el
+aprovisionamiento y despliegue permanecen pendientes de ejecución. En esa migración, RabbitMQ es,
+en principio, reemplazable por un servicio de mensajería equivalente en Azure (ver ADR-004; sin
+selección de servicio concreto todavía) manteniendo el mismo contrato de eventos
+(`NotificationRequested`, `NotificationFailed`), sin cambios en la lógica de dominio de Incident
+Service ni Notification Service. No se crean recursos Azure como parte de esta decisión; queda
+sujeta a aprobación explícita.

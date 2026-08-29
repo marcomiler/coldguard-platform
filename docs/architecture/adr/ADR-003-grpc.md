@@ -31,4 +31,17 @@ La comunicación asíncrona cross-service (por ejemplo, Incident Service → Not
 - ADR-008 (el Gateway traduce REST externo a gRPC interno).
 
 ## Evolución futura a Azure
-Los contratos gRPC no cambian con la migración a Azure. Los servicios pueden desplegarse en Azure Container Apps o AKS manteniendo comunicación gRPC interna igual que en el entorno local, opcionalmente con un service mesh o Azure API Management gestionando mTLS entre servicios. No se crean recursos Azure como parte de esta decisión.
+**Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el
+aprovisionamiento y despliegue permanecen pendientes de ejecución. Los contratos gRPC no cambian
+con esa migración. Los servicios pueden desplegarse en Azure Container Apps o AKS manteniendo comunicación gRPC interna igual que en el entorno local, opcionalmente con un service mesh o Azure API Management gestionando mTLS entre servicios. No se crean recursos Azure como parte de esta decisión.
+
+## Actualización posterior
+**Fecha por confirmar** (DEC-002, DEC-003, `docs/planning/decisions-log.md`).
+
+- **Cómputo planificado (DEC-002)**: Azure Container Apps queda confirmado como la plataforma
+  planificada de cómputo (backend y sensor-simulator), no AKS. La mención a AKS arriba queda como
+  alternativa descartada, no como opción abierta. Ningún recurso Azure se crea por esta
+  actualización.
+- **Protocolo de ingesta (DEC-003)**: Sensor Simulator → Telemetry Service usa gRPC interno,
+  consistente con esta decisión. La inyección manual/controlada de telemetría (CU-015) usa un
+  endpoint REST interno protegido, no gRPC — ver `docs/architecture/container-diagram.md`.

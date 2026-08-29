@@ -1,7 +1,7 @@
 # ADR-008 Responsabilidades del Gateway
 
 ## Contexto
-El C4 (`docs/architecture/c4.md`) incluye un `GW[Gateway]` como punto de entrada, y CLAUDE.md fija la regla "REST at the edge, gRPC internally", pero ningún documento detallaba qué hace exactamente el Gateway. Quedó registrado como riesgo R-008. RNF-002 exige correlación/trazabilidad completa y RNF-003 exige RBAC/autenticación (ver ADR-007).
+El C4 (`docs/architecture/container-diagram.md`) incluye un `GW[Gateway]` como punto de entrada, y CLAUDE.md fija la regla "REST at the edge, gRPC internally", pero ningún documento detallaba qué hace exactamente el Gateway. Quedó registrado como riesgo R-008. RNF-002 exige correlación/trazabilidad completa y RNF-003 exige RBAC/autenticación (ver ADR-007).
 
 ## Problema
 ¿Qué responsabilidades tiene el Gateway, y cuáles quedan explícitamente fuera de su alcance, para evitar que absorba lógica de dominio que le corresponde a Asset/Telemetry/Incident/Notification Service?
@@ -35,4 +35,21 @@ El Gateway **no** contiene reglas de negocio (RN-001 a RN-014 permanecen exclusi
 - ADR-007 (el Gateway valida el JWT emitido según esa decisión, antes de enrutar).
 
 ## Evolución futura a Azure
-En una eventual migración cloud, el Gateway es candidato a evolucionar hacia Azure API Management o Azure Application Gateway, manteniendo las mismas tres responsabilidades (auth, routing, propagación de contexto) sin trasladar lógica de dominio hacia la capa cloud. No se crean recursos Azure como parte de esta decisión; queda sujeta a aprobación explícita.
+**Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el
+aprovisionamiento y despliegue permanecen pendientes de ejecución. En esa migración, el Gateway
+es candidato ilustrativo a evolucionar hacia un servicio de gestión de API de Azure, manteniendo
+las mismas tres responsabilidades (auth, routing, propagación de contexto) sin trasladar lógica
+de dominio hacia la capa cloud; no hay una selección de servicio concreto todavía. No se crean
+recursos Azure como parte de esta decisión; queda sujeta a aprobación explícita.
+
+## Actualización posterior
+**Fecha por confirmar** (DEC-004, `docs/planning/decisions-log.md`).
+
+Identity & Access (usuarios, roles, asignaciones de acceso de RF-013/CU-014) queda confirmado como
+un módulo separado del Gateway, no como una responsabilidad del Gateway. Esto refuerza la
+decisión de este ADR: el Gateway permanece delgado (auth en el borde, routing, propagación de
+contexto), sin absorber la gestión de usuarios/roles ni ninguna otra lógica de negocio.
+
+**Segunda actualización (DEC-008)**: Identity & Access se aloja como módulo interno de Incident
+Service, no como microservicio propio. Sigue sin ser responsabilidad del Gateway, que conserva
+exactamente las mismas tres responsabilidades (auth, routing, propagación de contexto).
