@@ -7,7 +7,7 @@ recurso cloud está aprovisionado.
 | Capa | Local previsto | Azure planificado | Estado |
 |---|---|---|---|
 | Lenguaje/runtime backend | Java 25 | Java 25 (mismo runtime) | **Confirmada** (`CLAUDE.md`) |
-| Framework backend | Spring Boot 4+ | Spring Boot 4+ | **Preferida** — se validará compatibilidad antes de adoptar la versión final |
+| Framework backend | Spring Boot 4.1.1 (DEC-011, corregida) | Spring Boot 4.1.1 (mismo runtime) | **Confirmada** (DEC-011, corrección del 2026-08-29): versión verificada contra Maven Central, publicada el 20/08/2026; sustituye al registro previo erróneo ("4.x no publicado") |
 | Cómputo | Docker Compose (`deploy/local/docker-compose.yml`, RNF-001) | Azure Container Apps (DEC-002) | Local: **Planificada**. Azure: **Planificada**; ningún recurso creado |
 | Persistencia | PostgreSQL, una instancia con ownership lógico de esquema por servicio/módulo (`asset`, `telemetry`, `incident`, `identity`, `auditlog`), ADR-006, DEC-008 | Azure Database for PostgreSQL Flexible Server (DEC-002) | Local: **Confirmada**. Azure: **Planificada**; ningún recurso creado |
 | Mensajería | RabbitMQ (ADR-004) | RabbitMQ, contenedor planificado en Azure Container Apps (DEC-009); sin Azure Service Bus, sin alternativa gestionada | Local: **Confirmada**. Azure: **Planificada**; ningún recurso creado |
@@ -41,4 +41,7 @@ identidades, permisos, secretos ni ningún recurso ya creado.
 ## TODO
 
 Decisiones de stack específicas por servicio (librerías internas, versiones fijadas de
-dependencias): no definidas todavía.
+dependencias) — parcialmente resuelto por el scaffolding inicial (DEC-011: versión de Spring Boot,
+groupId/artifactId, convención de paquetes). Pendiente: esquema lógico de `notification-service`
+(sin confirmar en `docs/domain/bounded-contexts.md`) y el cableado de
+`micrometer-registry-prometheus` para exponer `/actuator/prometheus`.

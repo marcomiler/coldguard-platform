@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.coldguard</groupId>
+    <artifactId>coldguard-platform</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>notification-service</artifactId>
+
+  <name>ColdGuard Notification Service</name>
+  <description>Consumes IncidentCreated/IncidentEscalated via NotificationRequested (RabbitMQ, ADR-005, ADR-009); provider-agnostic notification adapter (RF-008).</description>
+
+  <!-- spring-boot-starter-web/-actuator/-validation and spring-boot-starter-test (test scope) are
+       inherited from the root pom (all 5 modules need them). data-jpa/postgresql are kept here
+       (not centralized) even though 4 of 5 modules use them, because gateway does not and no
+       logical schema is confirmed yet for this service (see DEC-011, application.yml). -->
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,28 @@
+# Build output
+target/
+*.class
+
+# Local secrets never commit real values
+.env
+.env.*
+!.env.example
+!deploy/local/.env.example
+
+# Terraform state and local overrides never committed
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Logs and generated PIDs
+*.log
+*.pid
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store

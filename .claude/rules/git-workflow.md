@@ -1,0 +1,10 @@
+- Commit messages are written in **English** (confirmed team preference), regardless of the language of the documentation being changed.
+- Only create commits when the user explicitly asks; never commit proactively at the end of a task.
+- Always create a new commit rather than amending, unless the user explicitly asks for `--amend`.
+- Never use `--no-verify`, `--no-gpg-sign`, or otherwise skip hooks/signing unless the user explicitly asks.
+- Stage files by name; avoid `git add -A` / `git add .` so unrelated or sensitive files (`.env`, credentials, Terraform state) are never swept into a commit.
+- Never force-push (`git push --force`) to `main`/`master` without explicit user approval; treat any force-push as a destructive action requiring confirmation.
+- `git push` always requires confirmation before running (see `.claude/settings.json`, `permissions.ask`) — this applies regardless of branch.
+- Do not push directly to `main`/`master` for application code once the backend exists; use a feature branch and a pull request. Documentation-only commits during the current academic phase may follow the existing repo convention (direct commits to `master`) unless the user says otherwise.
+- Before any command that could discard uncommitted work (`git checkout`/`restore`/`reset`/`clean`), run `git status` first and stash or commit anything found.
+- Never commit secrets, `.env` files, Terraform state, credentials, logs, or generated PIDs (`.claude/rules/security.md`, `.claude/rules/infra.md`).

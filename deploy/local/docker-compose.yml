@@ -1,26 +1,174 @@
 version: "3.9"
+
 services:
+  gateway:
+    build:
+      context: ../..
+      dockerfile: apps/gateway/Dockerfile
+    container_name: coldguard-gateway
+    environment:
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  asset-service:
+    build:
+      context: ../..
+      dockerfile: apps/asset-service/Dockerfile
+    container_name: coldguard-asset-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-coldguard}
+      DB_USER: ${POSTGRES_USER:-coldguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-coldguard}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  telemetry-service:
+    build:
+      context: ../..
+      dockerfile: apps/telemetry-service/Dockerfile
+    container_name: coldguard-telemetry-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-coldguard}
+      DB_USER: ${POSTGRES_USER:-coldguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-coldguard}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  incident-service:
+    build:
+      context: ../..
+      dockerfile: apps/incident-service/Dockerfile
+    container_name: coldguard-incident-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-coldguard}
+      DB_USER: ${POSTGRES_USER:-coldguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-coldguard}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ../..
+      dockerfile: apps/notification-service/Dockerfile
+    container_name: coldguard-notification-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-coldguard}
+      DB_USER: ${POSTGRES_USER:-coldguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-coldguard}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
   postgres:
     image: postgres:16
     container_name: coldguard-postgres
     environment:
-      POSTGRES_DB: coldguard
-      POSTGRES_USER: coldguard
-      POSTGRES_PASSWORD: coldguard
+      POSTGRES_DB: ${POSTGRES_DB:-coldguard}
+      POSTGRES_USER: ${POSTGRES_USER:-coldguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coldguard}
     ports:
       - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-coldguard} -d ${POSTGRES_DB:-coldguard}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   rabbitmq:
     image: rabbitmq:3-management
     container_name: coldguard-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-coldguard}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-coldguard}
     ports:
       - "5672:5672"
       - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   mailpit:
     image: axllent/mailpit:latest
     container_name: coldguard-mailpit
     ports:
       - "8025:8025"
       - "1025:1025"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: coldguard-prometheus
+    volumes:
+      - ../../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: coldguard-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+
+  loki:
+    image: grafana/loki:latest
+    container_name: coldguard-loki
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  grafana-data:
+  loki-data:
 
 networks:
   default:

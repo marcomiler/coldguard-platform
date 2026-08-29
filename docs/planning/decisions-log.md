@@ -344,6 +344,93 @@ concreto seleccionado". El equipo confirma la estrategia planificada para cerrar
 ### Trazabilidad
 RNF-003; `.claude/rules/security.md`; `docs/architecture/deployment-view.md`, `tech-stack.md`.
 
+## DEC-011 — Decisiones técnicas del scaffolding inicial (Sprint 1)
+
+**Fecha:** 2026-08-29
+**Estado:** Aprobada
+
+### Contexto
+El scaffolding inicial del monorepo backend (`apps/gateway`, `apps/asset-service`,
+`apps/telemetry-service`, `apps/incident-service`, `apps/notification-service`) requería fijar
+decisiones técnicas puntuales no cubiertas todavía por `docs/architecture/tech-stack.md`, cuyo TODO
+señalaba explícitamente: "Decisiones de stack específicas por servicio (librerías internas,
+versiones fijadas de dependencias): no definidas todavía".
+
+### Decisión
+- **Gestor de build**: Maven (ya confirmado en `CLAUDE.md`, no es una decisión nueva). Un módulo
+  Maven por servicio bajo `apps/`, reactor agregado por un `pom.xml` raíz (ADR-001).
+- **Versión de Spring Boot — registro original (2026-08-29), incorrecto**: se fijó la versión
+  incorrecta inicial, afirmando que "Spring Boot 4.x aún no está publicado" en
+  Maven Central. **Este dato era incorrecto**: Spring Boot 4.0 llevaba publicado desde el 20 de
+  noviembre de 2025 y Spring Boot 4.1 desde el 10 de junio de 2026, meses antes de esta decisión.
+  La consulta a Maven Central de esa ronda usó una API/índice que no devolvía resultados para
+  `v:4*`, y el resultado se aceptó sin contrastarlo con otra fuente. **Corregido en la ronda
+  siguiente** (mismo día, 2026-08-29): ver "Corrección posterior" más abajo.
+- **`groupId`/`artifactId`**: `com.coldguard` como `groupId` de todos los módulos; `artifactId`
+  igual al nombre de carpeta (`gateway`, `asset-service`, etc.). Paquete base
+  `com.coldguard.<servicio>` (p. ej. `com.coldguard.asset`).
+- **Convención de paquetes por módulo**: `config`, `api`, `application`, `domain`,
+  `infrastructure`, sin arquitectura hexagonal formal (DEC-008); son placeholders de
+  `package-info.java` sin lógica de negocio.
+- **Spring Security solo en `gateway`**: el resto de los servicios no incluye
+  `spring-boot-starter-security` como dependencia, porque la validación de JWT es responsabilidad
+  exclusiva del Gateway (ADR-007, ADR-008); los servicios internos confían en la identidad
+  propagada y no reimplementan auth de borde.
+- **Esquema de `notification-service` sin confirmar**: `application.yml` de este módulo no fija
+  `currentSchema` en la URL JDBC porque `docs/domain/bounded-contexts.md` no confirma un esquema
+  propio para Notification Service. Queda como decisión pendiente, no inventada aquí.
+- **Micrometer/Prometheus aún no cableado**: los módulos no incluyen todavía
+  `micrometer-registry-prometheus`; `observability/prometheus/prometheus.yml` solo hace
+  self-scrape hasta que esa dependencia se agregue en una ronda posterior.
+
+### Corrección posterior (2026-08-29, ronda siguiente)
+
+**Versión de Spring Boot — corregida**: `4.1.1` (artefacto
+`org.springframework.boot:spring-boot-starter-parent:4.1.1`), publicada en Maven Central el
+**20 de agosto de 2026** (verificado vía `central.sonatype.com/solrsearch`, campo `timestamp`
+`1787230308000` → `2026-08-20T00:11:48Z`). Es la última versión estable de la línea 4.1.x: existe
+`4.1.0` (publicada 2026-06-10) y milestones/RC previos (`4.1.0-M1..M4`, `4.1.0-RC1`), pero ninguna
+versión posterior a `4.1.1` (`4.1.2` no existe; `4.2.0-M1` es solo milestone, no GA). Se prefiere
+la línea 4.1.x sobre 4.0.x (última: `4.0.8`, misma fecha de publicación) porque 4.1 es la línea
+minor estable más reciente.
+
+Se aplica a `pom.xml` raíz (`spring-boot.version`) y a los cinco `apps/*/pom.xml`
+(`<parent><version>`).
+
+**Compatibilidad Java 25**: Spring Boot 4.1 soporta el rango Java 17-26; Java 25 (`CLAUDE.md`,
+confirmado, no se reabre aquí) cae dentro de ese rango. No se cambia `maven.compiler.release`
+(ya fijado en `25` desde el scaffolding inicial).
+
+**Revisión de breaking changes de Spring Boot 4** (RN/AC no aplica; revisión técnica de scaffolding):
+ninguno de los tres cambios conocidos (Jackson 3 como mínimo, JUnit 4 retirado del starter de test,
+Undertow retirado como servidor embebido soportado) requiere ajuste — el scaffolding ya no fijaba
+ninguna versión propia de Jackson, los cinco módulos de test ya usaban JUnit 5/Jupiter
+(`org.junit.jupiter.api.Test`), y ningún módulo declaraba `spring-boot-starter-undertow` (todos
+usan Tomcat, el valor por defecto de `spring-boot-starter-web`). Verificado por revisión estática
+(`grep` sobre los seis `pom.xml` y los cinco `*ApplicationTests.java`), sin ejecutar `mvn`.
+
+### Alternativas descartadas
+- Gradle como gestor de build: descartado; `CLAUDE.md` ya fija Maven en la sección "Technology",
+  no hay motivo para introducir un segundo gestor de build.
+- Incluir `spring-boot-starter-security` en todos los servicios "por si acaso": descartado;
+  contradice ADR-007/ADR-008 (el Gateway es el único componente que valida JWT).
+- Fijar `4.0.8` en vez de `4.1.1`: descartado; `4.1.x` es la línea minor estable más reciente y no
+  hay motivo documentado para preferir la línea anterior.
+
+### Consecuencias
+- `docs/architecture/tech-stack.md` actualiza su fila de "Framework backend" y su TODO para
+  reflejar la versión corregida (`4.1.1`) y la fecha de publicación verificada.
+- `.claude/rules/java-spring.md` referencia esta corrección; debe actualizarse en una ronda
+  posterior para dejar de tratar la sección "Spring Boot 4.1" como pendiente.
+- Ningún comando de build, Docker o Terraform se ejecutó como parte de este scaffolding ni de esta
+  corrección (`.claude/rules/infra.md`); no se verificó compilación real, solo revisión estática de
+  dependencias.
+
+### Trazabilidad
+ADR-001, ADR-006, ADR-007, ADR-008; DEC-008; `docs/architecture/tech-stack.md`,
+`docs/domain/bounded-contexts.md`, `docs/infrastructure/docker-strategy.md`,
+`.claude/rules/java-spring.md`.
+
 ## Referencias a decisiones registradas en otros documentos
 
 Decisiones confirmadas posteriores al cierre de Sprint 1, documentadas en su lugar natural
