@@ -14,12 +14,37 @@
   <artifactId>incident-service</artifactId>
 
   <name>ColdGuard Incident Service</name>
-  <description>Owns the Incident aggregate plus the internal Identity &amp; Access, Audit Log and operational-queries modules (DEC-004, DEC-005, DEC-006, DEC-008).</description>
+  <description>Owns the Incident aggregate plus the internal Identity &amp; Access, Audit Log and operational-queries modules.</description>
+
+  <!-- grpc.version/protobuf.version resolved empirically via `mvn dependency:tree` against the
+       spring-grpc-dependencies:1.0.3 BOM — not guessed, kept in sync with the BOM so
+       the protoc/protoc-gen-grpc-java build-time plugins match the runtime library versions. -->
+  <properties>
+    <grpc.version>1.77.1</grpc.version>
+    <protobuf.version>4.33.4</protobuf.version>
+    <!-- Referenced via ${excludedGroups} below (not hardcoded) so it stays overridable from the
+         command line, e.g. `mvn test -DexcludedGroups=` to include integration tests. -->
+    <excludedGroups>integration</excludedGroups>
+  </properties>
 
   <!-- spring-boot-starter-web/-actuator/-validation and spring-boot-starter-test (test scope) are
        inherited from the root pom (all 5 modules need them). Only this module's own dependencies
-       are declared below (ADR-006: this service owns the `incident`, `identity` and `auditlog`
-       logical PostgreSQL schemas, DEC-008). -->
+       are declared below (this service owns the `incident`, `identity` and `auditlog` logical
+       PostgreSQL schemas). -->
+  <dependencyManagement>
+    <dependencies>
+      <!-- Spring gRPC BOM: supports Spring Boot 4.1.x per its own reference docs,
+           verified before adoption. -->
+      <dependency>
+        <groupId>org.springframework.grpc</groupId>
+        <artifactId>spring-grpc-dependencies</artifactId>
+        <version>1.0.3</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -30,13 +55,77 @@
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- gRPC server only (this module exposes IncidentService.CreateIncident); no
+         client starter needed here. -->
+    <dependency>
+      <groupId>org.springframework.grpc</groupId>
+      <artifactId>spring-grpc-server-spring-boot-starter</artifactId>
+    </dependency>
+    <!-- Spring Boot 4 moved Flyway auto-configuration into its own starter module; flyway-core
+         alone is no longer picked up automatically. flyway-database-postgresql is required
+         separately since Flyway 10+ split per-database support out of flyway-core. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <!-- Spring Boot 4 moved @DataJpaTest support (org.springframework.boot.data.jpa.test.autoconfigure)
+         into its own module; not covered by spring-boot-starter-test + spring-boot-starter-data-jpa alone. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
+    <extensions>
+      <!-- Detects os.detected.classifier so protoc/protoc-gen-grpc-java download the right
+           native executable for this machine (standard grpc-java Maven pattern). -->
+      <extension>
+        <groupId>kr.motd.maven</groupId>
+        <artifactId>os-maven-plugin</artifactId>
+        <version>1.7.1</version>
+      </extension>
+    </extensions>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <!-- Excludes tests tagged "integration" (real PostgreSQL required) from the default
+             `mvn test` run, so plain unit tests stay fast and self-contained. Run integration
+             tests explicitly with `-DexcludedGroups=` (cleared) once a database is reachable. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludedGroups>${excludedGroups}</excludedGroups>
+        </configuration>
+      </plugin>
+      <plugin>
+        <!-- Compiles contracts/grpc/*.proto (shared monorepo source) into this
+             module's own generated sources. -->
+        <groupId>org.xolstice.maven.plugins</groupId>
+        <artifactId>protobuf-maven-plugin</artifactId>
+        <version>0.6.1</version>
+        <configuration>
+          <protoSourceRoot>${project.basedir}/../../contracts/grpc</protoSourceRoot>
+          <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+          <pluginId>grpc-java</pluginId>
+          <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>compile</goal>
+              <goal>compile-custom</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

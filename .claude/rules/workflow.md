@@ -65,3 +65,6 @@ validations performed, and unresolved risks or approvals still required.
 ## See also
 
 `.claude/README.md` for the command-vs-skill-vs-agent placement criterion (not repeated here).
+
+
+Do not reference ADR, DEC, RN, RF, or CU identifiers in POM files, source code, contracts, or runtime configuration by default. Keep rationale in architecture documentation. Use a targeted reference only when omitting it could make the implementation unsafe or genuinely non-obvious.

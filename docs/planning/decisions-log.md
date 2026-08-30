@@ -431,6 +431,68 @@ ADR-001, ADR-006, ADR-007, ADR-008; DEC-008; `docs/architecture/tech-stack.md`,
 `docs/domain/bounded-contexts.md`, `docs/infrastructure/docker-strategy.md`,
 `.claude/rules/java-spring.md`.
 
+## DEC-012 — Vertical slice habilitador: creación de incidente vía entrada técnica REST
+
+**Fecha:** 2026-08-29
+**Estado:** Aprobada
+
+### Contexto
+El equipo definió el vertical slice oficial del MVP para demostrar el backbone
+REST→gRPC→PostgreSQL→Transactional Outbox→evento→consumidor (ADR-003, ADR-005, ADR-006, ADR-008,
+ADR-009). CU-003 "Crear incidente automático" (RF-005) tiene actor Sistema, disparado por el
+evento `TelemetryThresholdBreached`; Telemetry Service y Asset Service no existen todavía
+(`docs/planning/roadmap.md`: Sprint 3, 4 y 5). Se requiere una entrada de datos que no dependa de
+esos servicios para no bloquear la demostración del backbone.
+
+### Decisión
+- El slice se implementa como demostración técnica del backbone de RF-005/CU-003 (parcial), con
+  un endpoint REST explícitamente técnico/interno que recibe datos de anomalía ya clasificados
+  (impacto y urgencia, no telemetría cruda), sin JWT (ADR-007 sigue pendiente de Sprint 4).
+- Se adelanta parte del alcance de Sprint 5 (Incident Service, RabbitMQ, Transactional Outbox)
+  como **excepción controlada y documentada** de `docs/planning/roadmap.md`, no como
+  reordenamiento silencioso del roadmap; el roadmap no se reescribe.
+- Notification Service obtiene esquema propio `notification` en PostgreSQL (ADR-006), mínimo
+  para idempotencia y registro de procesamiento del evento — sin envío real de notificación
+  (Mailpit queda fuera de este slice).
+- RN-004 (no duplicar incidentes equivalentes mientras exista uno abierto) se expone como HTTP
+  409 Conflict en el borde REST y como `ALREADY_EXISTS` (código gRPC 6) en el contrato interno —
+  mapeo estándar REST↔gRPC para conflicto de estado.
+- Formato del evento `IncidentCreated`: JSON simple versionado (campo `eventVersion`), sin Avro,
+  Protobuf de eventos ni schema registry.
+- Librería gRPC: Spring gRPC (`org.springframework.grpc:spring-grpc-spring-boot-starter`,
+  compatible con Spring Boot 4.1.x según su documentación oficial, verificado antes de esta
+  decisión).
+- Herramienta de migración: Flyway, con `spring-boot-starter-flyway` +
+  `flyway-database-postgresql` (estructura modular de auto-configuración de Spring Boot 4,
+  verificado antes de esta decisión), por servicio, por esquema lógico (ADR-006).
+
+### Alternativas descartadas
+- Esperar a que Telemetry Service y Asset Service existan antes de cualquier slice de Incident
+  Service: descartado; bloquearía la demostración del backbone asíncrono hasta completar el
+  Sprint 5 entero.
+- Omitir esquema propio de Notification Service y usar solo memoria o logs: descartado; se
+  necesita persistencia real para probar idempotencia ante redelivery (`.claude/rules/testing.md`).
+- `grpc-java` crudo en vez de Spring gRPC: descartado sin evidencia de incompatibilidad real con
+  Spring Boot 4.1.1; Spring gRPC es la opción con auto-configuración nativa de la versión ya
+  fijada (DEC-011) y compatibilidad documentada oficialmente.
+- `flyway-core` sin el starter modular: descartado; Spring Boot 4 ya no autoconfigura Flyway solo
+  con `flyway-core` en el classpath, requiere `spring-boot-starter-flyway`.
+
+### Consecuencias
+- `docs/planning/roadmap.md` no se reescribe; esta excepción queda documentada aquí, no como
+  reordenamiento del Sprint 5.
+- `docs/domain/bounded-contexts.md` deja de listar el esquema de Notification Service como
+  pendiente una vez implementado.
+- `docs/domain/commands-events.md` deja de marcar el formato físico de `IncidentCreated` como
+  TODO una vez implementado.
+- `docs/architecture/tech-stack.md` debe reflejar Flyway y Spring gRPC como herramientas ya
+  seleccionadas para este slice, en una ronda de documentación posterior a la implementación.
+- No se crea ningún recurso Azure ni se modifica `.claude/rules/infra.md`.
+
+### Trazabilidad
+RF-005; CU-003 (parcial); RN-004, RN-010, RN-011, RN-012; ADR-003, ADR-005, ADR-006, ADR-008,
+ADR-009; `docs/planning/roadmap.md` (Sprint 5); `docs/domain/bounded-contexts.md`.
+
 ## Referencias a decisiones registradas en otros documentos
 
 Decisiones confirmadas posteriores al cierre de Sprint 1, documentadas en su lugar natural

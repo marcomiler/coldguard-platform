@@ -47,7 +47,7 @@ observabilidad) usan interfaz/adaptador.
 
 ## Setup local
 
-Requisitos: JDK 25, Maven 3.9+, Docker y Docker Compose.
+Requisitos: JDK 25, Maven 4.1+, Docker y Docker Compose.
 
 1. Compilar y ejecutar las pruebas del monorepo:
 
@@ -73,3 +73,42 @@ Requisitos: JDK 25, Maven 3.9+, Docker y Docker Compose.
 
 No se crean recursos Azure ni se ejecuta `terraform apply` como parte de este setup local
 (`.claude/rules/infra.md`).
+
+
+## Incident slice local run
+
+### Regenerate gRPC sources
+
+```bash
+rm -rf apps/incident-service/target
+rm -rf apps/gateway/target
+
+mvn -pl apps/incident-service,apps/gateway clean generate-sources
+```
+
+If the IDE still shows unresolved imports, reimport the Maven project and refresh generated
+sources under:
+
+- `target/generated-sources/protobuf/java`
+- `target/generated-sources/protobuf/grpc-java`
+
+### Run locally
+
+```bash
+docker compose -f deploy/local/docker-compose.yml up -d postgres
+mvn -pl apps/incident-service spring-boot:run
+mvn -pl apps/gateway spring-boot:run
+```
+
+#### Down docker locally
+```bash
+docker compose -f deploy/local/docker-compose.yml down
+```
+
+### Quick test
+
+```bash
+curl -i -X POST http://localhost:8080/api/v1/incidents \
+  -H "Content-Type: application/json" \
+  -d '{"assetId":"asset-1","assetCriticality":"CRITICALITY_HIGH","sensorId":"sensor-1","anomalyType":"high-temperature","magnitude":"MAGNITUDE_HIGH","persistent":false,"correlationId":"corr-1"}'
+```

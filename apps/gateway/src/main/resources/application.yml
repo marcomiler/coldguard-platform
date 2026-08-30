@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: gateway
+  grpc:
+    client:
+      channels:
+        incident-service:
+          address: static://${INCIDENT_SERVICE_HOST:localhost}:${INCIDENT_SERVICE_GRPC_PORT:9090}
 
 management:
   endpoints:
