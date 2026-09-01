@@ -12,11 +12,6 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Creates incidents, rejecting a request that matches the asset/sensor/anomaly-type combination
- * of an incident already open (enforced by a uniqueness constraint at the persistence layer,
- * IncidentRepository).
- */
 @Service
 public class CreateIncidentService {
 
@@ -50,8 +45,10 @@ public class CreateIncidentService {
         try {
             incidentRepository.save(incident);
         } catch (DuplicateIncidentException ex) {
-            // Lost a race against a concurrent request for the same asset/sensor/anomaly type:
-            // the uniqueness constraint is the final authority, re-read the winning incident id.
+            // Lost a race against a concurrent request for the same asset/sensor/anomaly
+            // type:
+            // the uniqueness constraint is the final authority, re-read the winning
+            // incident id.
             String existingId = findExistingId(command, ex);
             throw new IncidentAlreadyOpenException(existingId);
         }

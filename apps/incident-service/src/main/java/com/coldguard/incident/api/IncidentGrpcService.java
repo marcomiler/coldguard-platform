@@ -30,14 +30,14 @@ public class IncidentGrpcService extends IncidentServiceGrpc.IncidentServiceImpl
     private final IncidentGrpcExceptionHandler exceptionHandler;
 
     public IncidentGrpcService(CreateIncidentService createIncidentService,
-                                IncidentGrpcExceptionHandler exceptionHandler) {
+            IncidentGrpcExceptionHandler exceptionHandler) {
         this.createIncidentService = createIncidentService;
         this.exceptionHandler = exceptionHandler;
     }
 
     @Override
     public void createIncident(CreateIncidentRequest request,
-                                StreamObserver<CreateIncidentResponse> responseObserver) {
+            StreamObserver<CreateIncidentResponse> responseObserver) {
         String correlationId = request.getCorrelationId();
         boolean correlationIdPresent = !correlationId.isBlank();
         if (correlationIdPresent) {
@@ -86,7 +86,7 @@ public class IncidentGrpcService extends IncidentServiceGrpc.IncidentServiceImpl
             case CRITICALITY_HIGH -> Criticality.HIGH;
             case CRITICALITY_CRITICAL -> Criticality.CRITICAL;
             case CRITICALITY_UNSPECIFIED, UNRECOGNIZED ->
-                    throw new IllegalArgumentException("asset_criticality is required");
+                throw new IllegalArgumentException("asset_criticality is required");
         };
     }
 
@@ -97,7 +97,7 @@ public class IncidentGrpcService extends IncidentServiceGrpc.IncidentServiceImpl
             case MAGNITUDE_HIGH -> Magnitude.HIGH;
             case MAGNITUDE_CRITICAL -> Magnitude.CRITICAL;
             case MAGNITUDE_UNSPECIFIED, UNRECOGNIZED ->
-                    throw new IllegalArgumentException("magnitude is required");
+                throw new IllegalArgumentException("magnitude is required");
         };
     }
 
@@ -128,9 +128,10 @@ public class IncidentGrpcService extends IncidentServiceGrpc.IncidentServiceImpl
         };
     }
 
-    private static com.coldguard.incident.grpc.v1.IncidentStatus toGrpcStatus(IncidentStatus status) {
+    static com.coldguard.incident.grpc.v1.IncidentStatus toGrpcStatus(IncidentStatus status) {
         return switch (status) {
             case CREATED -> com.coldguard.incident.grpc.v1.IncidentStatus.CREATED;
+            case CLOSED -> com.coldguard.incident.grpc.v1.IncidentStatus.CLOSED;
         };
     }
 }

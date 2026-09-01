@@ -52,6 +52,7 @@ enum Priority {
 enum IncidentStatus {
   INCIDENT_STATUS_UNSPECIFIED = 0;
   CREATED = 1;
+  CLOSED = 2;
 }
 
 message CreateIncidentRequest {

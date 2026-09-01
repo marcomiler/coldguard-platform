@@ -1,9 +1,5 @@
 package com.coldguard.incident.domain;
 
-/**
- * Thrown when a creation request matches the asset/sensor/anomaly-type combination of an
- * incident that is already open.
- */
 public class IncidentAlreadyOpenException extends RuntimeException {
 
     private final String existingIncidentId;

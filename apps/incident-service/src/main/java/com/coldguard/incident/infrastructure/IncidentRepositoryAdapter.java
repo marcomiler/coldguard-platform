@@ -3,6 +3,7 @@ package com.coldguard.incident.infrastructure;
 import com.coldguard.incident.application.DuplicateIncidentException;
 import com.coldguard.incident.application.IncidentRepository;
 import com.coldguard.incident.domain.Incident;
+import com.coldguard.incident.domain.IncidentStatus;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
@@ -40,7 +41,41 @@ public class IncidentRepositoryAdapter implements IncidentRepository {
 
     @Override
     public Optional<String> findOpenIncidentId(String assetId, String sensorId, String anomalyType) {
-        return jpaRepository.findFirstByAssetIdAndSensorIdAndAnomalyType(assetId, sensorId, anomalyType)
+        return jpaRepository.findFirstByAssetIdAndSensorIdAndAnomalyTypeAndStatus(
+                assetId, sensorId, anomalyType, IncidentStatus.CREATED)
                 .map(entity -> entity.getId().toString());
+    }
+
+    @Override
+    public Optional<Incident> findById(String incidentId) {
+        return jpaRepository.findById(UUID.fromString(incidentId)).map(this::toDomain);
+    }
+
+    @Override
+    public void update(Incident incident) {
+        IncidentEntity entity = new IncidentEntity(
+                UUID.fromString(incident.id()),
+                incident.assetId(),
+                incident.sensorId(),
+                incident.anomalyType(),
+                incident.impact(),
+                incident.urgency(),
+                incident.priority(),
+                incident.status(),
+                incident.createdAt());
+        jpaRepository.saveAndFlush(entity);
+    }
+
+    private Incident toDomain(IncidentEntity entity) {
+        return new Incident(
+                entity.getId().toString(),
+                entity.getAssetId(),
+                entity.getSensorId(),
+                entity.getAnomalyType(),
+                entity.getImpact(),
+                entity.getUrgency(),
+                entity.getPriority(),
+                entity.getStatus(),
+                entity.getCreatedAt());
     }
 }

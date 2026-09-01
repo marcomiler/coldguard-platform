@@ -493,6 +493,56 @@ esos servicios para no bloquear la demostración del backbone.
 RF-005; CU-003 (parcial); RN-004, RN-010, RN-011, RN-012; ADR-003, ADR-005, ADR-006, ADR-008,
 ADR-009; `docs/planning/roadmap.md` (Sprint 5); `docs/domain/bounded-contexts.md`.
 
+## DEC-013 — Ciclo de vida mínimo de Incident: CREATED -> CLOSED
+
+**Fecha:** 2026-08-31
+**Estado:** Aprobada
+
+### Contexto
+El slice de creación de incidentes (DEC-012) dejó `IncidentStatus` con un único valor, `CREATED`,
+y una constraint única global (`ux_incident_open`) que impedía reutilizar la combinación
+asset/sensor/anomaly_type incluso después de que el incidente correspondiente dejara de estar
+abierto. RN-004 exige unicidad solo "mientras exista uno abierto"; RN-007 y RN-019 confirman que
+existe un cierre técnico (`IncidentClosed`, único evento de cierre en el MVP, ver
+`docs/domain/commands-events.md`), pero el mecanismo de autorización y el caso de uso completo de
+cierre (Técnico de mantenimiento, causa, comentario de resolución) no forman parte de este slice.
+
+### Decisión
+- `IncidentStatus` se amplía a `CREATED` y `CLOSED`, con una única transición soportada,
+  `CREATED -> CLOSED` (`Incident.close()`), sin introducir `ACKNOWLEDGED` ni `ESCALATED` como
+  estados: quedan como eventos futuros hasta que existan operaciones y guards propios.
+- La constraint única global `ux_incident_open` se reemplaza por un índice único parcial
+  `(asset_id, sensor_id, anomaly_type) WHERE status = 'CREATED'` (migración
+  `V2__restrict_unique_open_incident.sql`), preservando la garantía de RN-004 sin bloquear la
+  reutilización de la misma combinación una vez cerrado el incidente anterior.
+- Se agrega un mecanismo mínimo de cierre en `application`/`infrastructure`
+  (`CloseIncidentCommand`, `CloseIncidentService`) para poder ejercer y probar la transición.
+  **No** se expone por gRPC nuevo RPC, REST ni Gateway, y **no** se resuelve autorización
+  (RN-019) en este slice.
+- El enum `IncidentStatus` del contrato gRPC (`contracts/grpc/incident_service.proto`) gana
+  `CLOSED = 2`, conservando `INCIDENT_STATUS_UNSPECIFIED = 0` y `CREATED = 1` sin cambios. Se
+  registra como DEC y no como ADR: es una decisión operativa dentro de la arquitectura ya
+  decidida (ADR-003), no una decisión arquitectónica nueva. Agregar un valor de enum sin alterar
+  nombres ni números existentes es un cambio compatible según ADR-003 ("cambios incompatibles...
+  requieren versionado explícito"); no se abre paquete `v2`.
+
+### Opciones consideradas
+- Mantener `IncidentStatus` en un único valor hasta abrir un contrato gRPC v2: descartado:
+  posponía indefinidamente una capacidad ya requerida por RN-004/RN-007 sin necesidad, dado que
+  agregar el valor de enum es compatible.
+- Cambiar dominio + persistencia + contrato gRPC + Gateway + autorización en una sola iteración:
+  descartado por alcance; RN-019 (autorización de cierre) no está resuelto todavía y mezclarlo
+  aquí habría ampliado el slice más allá de lo aprobado.
+
+### Consecuencias
+- `findOpenIncidentId` pasa a filtrar explícitamente por `status = CREATED`.
+- Un incidente `CLOSED` no bloquea la creación de uno nuevo para la misma combinación
+  asset/sensor/anomaly_type.
+- La migración `V1` no se modifica; el cambio se aplica exclusivamente vía `V2`.
+
+### Trazabilidad
+RN-004, RN-007, RN-019; ADR-003; `docs/domain/commands-events.md`; DEC-012.
+
 ## Referencias a decisiones registradas en otros documentos
 
 Decisiones confirmadas posteriores al cierre de Sprint 1, documentadas en su lugar natural

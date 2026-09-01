@@ -79,6 +79,12 @@ class IncidentGrpcServiceTest {
     }
 
     @Test
+    void toGrpcStatus_mapsClosed() {
+        assertThat(IncidentGrpcService.toGrpcStatus(com.coldguard.incident.domain.IncidentStatus.CLOSED))
+                .isEqualTo(IncidentStatus.CLOSED);
+    }
+
+    @Test
     void createIncident_missingCriticality_returnsInvalidArgument() {
         CreateIncidentRequest request = CreateIncidentRequest.newBuilder()
                 .setAssetId("asset-1")
@@ -97,16 +103,28 @@ class IncidentGrpcServiceTest {
 
     private static final class InMemoryIncidentRepository implements IncidentRepository {
         private final ConcurrentHashMap<String, String> openIncidentIdByKey = new ConcurrentHashMap<>();
+        private final ConcurrentHashMap<String, Incident> incidentsById = new ConcurrentHashMap<>();
 
         @Override
         public void save(Incident incident) {
             String key = incident.assetId() + "|" + incident.sensorId() + "|" + incident.anomalyType();
             openIncidentIdByKey.putIfAbsent(key, incident.id());
+            incidentsById.put(incident.id(), incident);
         }
 
         @Override
         public Optional<String> findOpenIncidentId(String assetId, String sensorId, String anomalyType) {
             return Optional.ofNullable(openIncidentIdByKey.get(assetId + "|" + sensorId + "|" + anomalyType));
+        }
+
+        @Override
+        public Optional<Incident> findById(String incidentId) {
+            return Optional.ofNullable(incidentsById.get(incidentId));
+        }
+
+        @Override
+        public void update(Incident incident) {
+            incidentsById.put(incident.id(), incident);
         }
     }
 
