@@ -112,3 +112,40 @@ curl -i -X POST http://localhost:8080/api/v1/incidents \
   -H "Content-Type: application/json" \
   -d '{"assetId":"asset-1","assetCriticality":"CRITICALITY_HIGH","sensorId":"sensor-1","anomalyType":"high-temperature","magnitude":"MAGNITUDE_HIGH","persistent":false,"correlationId":"corr-1"}'
 ```
+
+## Scripts locales (bootstrap y validación)
+
+Prerrequisitos: bash, Docker y Docker Compose, JDK 25, Maven 4.1+. En Windows, usar WSL2 — no hay soporte nativo.
+
+### Levantar PostgreSQL (`deploy/scripts/bootstrap.sh`)
+
+```bash
+deploy/scripts/bootstrap.sh
+```
+
+Copia `deploy/local/.env` desde `.env.example` solo si no existe todavía, levanta únicamente el
+contenedor `postgres` (`docker compose -f deploy/local/docker-compose.yml up -d postgres`) y
+espera su healthcheck con un timeout explícito (60s por defecto, configurable con
+`HEALTHCHECK_TIMEOUT_SECONDS`). No genera fuentes gRPC ni limpia contenedores/volúmenes.
+
+Para detenerlo manualmente cuando termines:
+
+```bash
+docker compose -f deploy/local/docker-compose.yml stop postgres
+```
+
+Esto conserva los datos (volumen `postgres-data`). No ejecutes `docker compose ... down -v`
+salvo que quieras borrar todos los datos locales.
+
+### Correr tests (`deploy/scripts/run-tests.sh`)
+
+```bash
+deploy/scripts/run-tests.sh unit          # solo unitarios, sin PostgreSQL
+deploy/scripts/run-tests.sh integration   # solo integración, requiere PostgreSQL local ya levantado
+deploy/scripts/run-tests.sh all           # unitarios y luego integración
+```
+
+El modo `integration` requiere que `bootstrap.sh` (o el `docker compose up -d postgres` manual de
+arriba) ya esté corriendo; si no detecta el contenedor `coldguard-postgres` listo, falla con un
+mensaje indicando cómo levantarlo. El script no levanta PostgreSQL por sí mismo ni limpia nada al
+terminar.
