@@ -543,6 +543,53 @@ cierre (Técnico de mantenimiento, causa, comentario de resolución) no forman p
 ### Trazabilidad
 RN-004, RN-007, RN-019; ADR-003; `docs/domain/commands-events.md`; DEC-012.
 
+## DEC-014 — Alcance pospuesto: exposición de cierre de incidente (`CloseIncident`) por REST/gRPC
+
+**Fecha:** 2026-08-31
+**Estado:** Aprobada (decisión de alcance/planificación, no de mecanismo técnico)
+
+### Contexto
+DEC-013 dejó el ciclo de vida `CREATED -> CLOSED` implementado y validado en dominio y
+persistencia de Incident Service, sin exponerlo por Gateway/REST ni por un RPC gRPC dedicado
+(fuera de alcance explícito de esa decisión). Un análisis posterior (sin cambios de código)
+evaluó cómo exponer el cierre por REST y encontró que la autorización de RN-019 (solo el Técnico
+de mantenimiento puede cerrar) depende de JWT/RBAC real en el Gateway (ADR-007), que
+`.claude/rules/security.md` confirma **no implementado todavía** (Gateway acepta toda petición;
+seguridad real está planificada para Sprint 4, `docs/planning/roadmap.md`). El mecanismo de
+propagación de identidad del Gateway a los servicios internos queda explícitamente abierto en
+ADR-007 ("vía metadata gRPC... o revalidan el token según se defina en implementación").
+
+### Decisión
+- Se pospone la implementación del RPC `CloseIncident` y del endpoint REST correspondiente hasta
+  Sprint 4, cuando exista JWT/RBAC real en el Gateway. No se implementa en esta iteración.
+- El payload HTTP del cierre **no** aceptará `actorId` ni `role` como campos de entrada: la
+  identidad del actor debe derivarse únicamente del JWT validado en el Gateway, nunca de un dato
+  autodeclarado por el llamador.
+- Se confirma la separación de responsabilidades para cuando se implemente:
+  - el Gateway autentica el JWT, extrae identidad/rol y aplica el rechazo 403 (ADR-007, ADR-008);
+  - Incident Service recibe la identidad mediante el mecanismo interno que se apruebe en su
+    momento, sin parsear JWT ni headers crudos (`.claude/rules/security.md`);
+  - `domain`/`application` de Incident Service no dependen de JWT, Spring Security ni headers
+    HTTP; el dominio valida únicamente la transición `CREATED -> CLOSED` (ya implementada en
+    DEC-013), no la autorización del actor.
+- **No se fija todavía** el mecanismo de propagación de identidad (metadata gRPC vs. revalidación
+  de token): sigue siendo el punto abierto de ADR-007. La propuesta de usar metadata gRPC hecha en
+  el análisis previo queda registrada como propuesta a confirmar junto con la implementación real
+  de seguridad en Sprint 4, no como decisión tomada.
+
+### Consecuencias
+- El RPC `CloseIncident`, sus mensajes en `contracts/grpc/incident_service.proto`, el endpoint
+  REST del Gateway y los mapeos de estado HTTP/gRPC asociados quedan fuera del alcance hasta
+  Sprint 4.
+- Cuando se implemente JWT/RBAC (Sprint 4), debe resolverse antes de codificar `CloseIncident`:
+  el mecanismo de propagación de identidad Gateway → Incident Service (actualización de ADR-007,
+  no un ADR nuevo, según el criterio ya usado en sus propias secciones "Actualización posterior").
+- No se crea código ni se modifica ningún `.proto` como parte de este DEC.
+
+### Trazabilidad
+RN-019, RN-007; ADR-007, ADR-008; DEC-013; `docs/planning/roadmap.md` (Sprint 4);
+`.claude/rules/security.md`.
+
 ## Referencias a decisiones registradas en otros documentos
 
 Decisiones confirmadas posteriores al cierre de Sprint 1, documentadas en su lugar natural
