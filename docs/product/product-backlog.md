@@ -324,6 +324,97 @@ cloud.
   trabajo de Sprint 5, 6 ni 7 por adelantado. La recomendación de dividir por servicio o por señal
   queda registrada para el refinamiento previo a Sprint 5.
 
+## Historias de usuario — EPIC-03 (gestión de incidentes)
+
+### HU-023 — Crear incidentes automáticamente con prioridad calculada
+**Como** Sistema, **quiero** crear un incidente automáticamente con impacto/urgencia/prioridad
+calculados a partir de la criticidad del activo y la magnitud de la anomalía, **para** priorizar
+la atención sin intervención manual.
+- Criterios de aceptación:
+  - Una solicitud de creación con activo, sensor, tipo de anomalía, criticidad del activo y
+    magnitud calcula impacto, urgencia y prioridad (matriz 4×4, RN-012) y crea el incidente con
+    estado CREATED.
+  - La respuesta incluye identificador, estado, impacto, urgencia, prioridad y fecha de creación.
+  - La entrada es un endpoint técnico/interno (DEC-012), no la integración real con Telemetry
+    Service, que no existe todavía.
+- Prioridad: Must have.
+- Estimación: pendiente de normalización retrospectiva; implementación y tests existentes.
+- Dependencias: RN-012 (matriz impacto/urgencia, `docs/product/business-rules.md`, documentada
+  como parte de HU-005) — dependencia documental, no funcional.
+- Sprint: implementación adelantada, sin sprint formal asociado. Se propone Sprint 5 como sprint
+  de regularización (registrar retroactivamente su cierre), **pendiente de decisión explícita**
+  del Product Owner/Scrum Master — no se asume Sprint 5 como comprometido para esto.
+- Estado técnico: implementada y testeada (`CreateIncidentService`, `PriorityCalculator`,
+  `IncidentController`; `CreateIncidentServiceTest`, `IncidentGrpcServiceTest`,
+  `IncidentControllerTest`, `IncidentGrpcClientTest`).
+- Estado académico: no evidenciada (ningún documento de `docs/academic/` la referencia todavía).
+
+### HU-024 — Rechazar incidentes duplicados mientras uno esté abierto
+**Como** Sistema, **quiero** rechazar una solicitud de creación si ya existe un incidente abierto
+para la misma combinación de activo, sensor y tipo de anomalía, **para** evitar duplicados
+(RN-004).
+- Criterios de aceptación:
+  - Una segunda solicitud equivalente mientras el primer incidente sigue en CREATED es rechazada,
+    devolviendo el identificador del incidente existente.
+  - La unicidad se garantiza a nivel de base de datos (índice único), incluso ante solicitudes
+    concurrentes.
+  - Un incidente en estado CLOSED no bloquea una nueva solicitud equivalente.
+- Prioridad: Must have.
+- Estimación: pendiente de normalización retrospectiva; implementación y tests existentes.
+- Dependencias: HU-023.
+- Sprint: implementación adelantada, sin sprint formal asociado — mismo tratamiento que HU-023.
+- Estado técnico: implementada y testeada (`V1`/`V2` migraciones, `DuplicateIncidentException`,
+  `IncidentAlreadyOpenException`; `IncidentRepositoryAdapterTest` incl. concurrencia,
+  `CreateIncidentServiceTest`, `IncidentControllerTest.createIncident_alreadyExists_returns409`).
+- Estado académico: no evidenciada.
+
+### HU-025 — Modelar el ciclo de vida mínimo del incidente (CREATED → CLOSED)
+**Como** Sistema, **quiero** representar que un incidente puede pasar de creado a cerrado, **para**
+tener una base de estado sobre la cual ejecutar el cierre técnico real (RN-007, RN-019).
+- Criterios de aceptación:
+  - El estado de negocio del incidente admite únicamente CREATED y CLOSED.
+  - Un incidente CREATED transiciona a CLOSED una sola vez; un segundo intento sobre un incidente
+    ya CLOSED es rechazado.
+  - Los eventos ya catalogados `IncidentAcknowledged` e `IncidentEscalated`
+    (`docs/domain/commands-events.md`) no se traducen en esta historia a valores del enum de
+    estado; su eventual representación como estado, si llegara a decidirse, queda fuera de este
+    alcance.
+  - El valor `INCIDENT_STATUS_UNSPECIFIED = 0` del enum `IncidentStatus` en
+    `contracts/grpc/incident_service.proto` es el valor centinela técnico por defecto de proto3
+    (todo enum de protobuf requiere un primer valor por defecto/no seteado); no representa un
+    tercer estado de negocio del incidente.
+- Prioridad: Must have.
+- Estimación: pendiente de normalización retrospectiva; implementación y tests existentes.
+- Dependencias: HU-023.
+- Sprint: implementación adelantada, sin sprint formal asociado — mismo tratamiento que HU-023.
+- Estado técnico: implementada y testeada (`IncidentStatus`, `Incident.close()`; `IncidentTest`,
+  `IncidentGrpcServiceTest.toGrpcStatus_mapsClosed`).
+- Estado académico: no evidenciada.
+
+### HU-026 — Cerrar un incidente (Técnico de mantenimiento) — parcial
+**Como** Técnico de mantenimiento, **quiero** cerrar técnicamente un incidente, **para** detener
+el MTTR y dejar registrado el diagnóstico, causa y comentario de resolución (RN-007, RN-019).
+- Criterios de aceptación, separados por lo que ya existe y lo que falta:
+  - **Dominio/aplicación — implementado**: dado un incidente en CREATED, cerrarlo lo deja en
+    CLOSED; cerrar un incidente inexistente o ya CLOSED es rechazado explícitamente
+    (`CloseIncidentService`, `IncidentAlreadyClosedException`, `IncidentNotFoundException`).
+  - **RPC gRPC / endpoint REST — pendiente**: no existe ningún RPC `CloseIncident` en
+    `contracts/grpc/incident_service.proto` ni endpoint en el Gateway (DEC-014).
+  - **JWT/RBAC — pendiente**: no se valida que el actor sea el Técnico de mantenimiento; requiere
+    JWT/RBAC real (Sprint 4, sin implementar).
+  - **Causa/comentario de resolución (RN-007) — pendiente**: no se exige ni persiste en la capa
+    hoy implementada.
+  - **Evidencia académica — pendiente**: ningún documento de `docs/academic/` la referencia.
+  - Esta historia **no se marca como completa** mientras falte cualquiera de los cuatro puntos
+    pendientes de arriba.
+- Prioridad: Must have.
+- Estimación: por estimar; depende de que exista JWT/RBAC (Sprint 4).
+- Dependencias: HU-025; JWT/RBAC (Sprint 4, sin HU propia todavía).
+- Sprint: parcialmente implementado, fuera de sprint formal; el RPC/REST/JWT/RBAC restante se
+  ubicaría en Sprint 4/5 según se decida — no confirmado.
+- Estado técnico: **parcial** (ver desglose arriba); test existente: `CloseIncidentServiceTest`.
+- Estado académico: no evidenciada.
+
 ### HU-022 — Exportación planificada de observabilidad a Azure
 **Como** equipo de proyecto, **quiero** configurar la exportación de OpenTelemetry hacia
 Application Insights/Azure Monitor y Azure Monitor Logs/Log Analytics, **para** contar con

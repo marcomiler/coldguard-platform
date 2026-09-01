@@ -32,7 +32,7 @@ cada versión se marca explícitamente con su estado.
   continua (CI), pruebas de capacidad/rendimiento, e integración planificada del adaptador de
   notificaciones con Azure Communication Services Email como proveedor productivo (DEC-007,
   `docs/planning/decisions-log.md`), sin afirmar recurso creado ni correos reales enviados.
-- **Evidencia de aceptación**: por definir junto con el backlog de Sprint 5 y Sprint 6
+- **Evidencia de aceptación**: por definir junto con el backlog de Sprint 6
   (`docs/planning/roadmap.md`).
 - **Estado**: Planificada.
 
@@ -44,7 +44,7 @@ cada versión se marca explícitamente con su estado.
   Log Analytics — `docs/operations/observability-strategy.md`), eventos de dominio, gestión
   completa de incidentes, continuidad y backups, y evidencia operativa (runbooks, capturas,
   escenarios).
-- **Evidencia de aceptación**: por definir junto con el backlog de Sprint 7
+- **Evidencia de aceptación**: por definir junto con el backlog de Sprint 5 y Sprint 7
   (`docs/planning/roadmap.md`).
 - **Estado**: Planificada. Ninguna capacidad de observabilidad cloud está implementada ni
   desplegada.
