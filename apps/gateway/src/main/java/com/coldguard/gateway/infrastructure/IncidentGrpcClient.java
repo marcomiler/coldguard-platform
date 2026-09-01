@@ -1,5 +1,7 @@
 package com.coldguard.gateway.infrastructure;
 
+import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
+import com.coldguard.incident.grpc.v1.CloseIncidentResponse;
 import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.CreateIncidentResponse;
 import com.coldguard.incident.grpc.v1.IncidentServiceGrpc;
@@ -29,12 +31,23 @@ public class IncidentGrpcClient {
         }
     }
 
+    public CloseIncidentResponse closeIncident(CloseIncidentRequest request) {
+        try {
+            return stub.closeIncident(request);
+        } catch (StatusRuntimeException ex) {
+            throw translate(ex);
+        }
+    }
+
     private static IncidentServiceException translate(StatusRuntimeException ex) {
         Status status = ex.getStatus();
         String message = status.getDescription();
         return switch (status.getCode()) {
             case ALREADY_EXISTS -> new IncidentAlreadyExistsException(message, ex);
             case INVALID_ARGUMENT -> new InvalidIncidentRequestException(message, ex);
+            case NOT_FOUND -> new IncidentNotFoundException(message, ex);
+            case FAILED_PRECONDITION -> new IncidentAlreadyClosedException(message, ex);
+            case PERMISSION_DENIED -> new IncidentCloseForbiddenException(message, ex);
             default -> new IncidentServiceException(message, ex);
         };
     }

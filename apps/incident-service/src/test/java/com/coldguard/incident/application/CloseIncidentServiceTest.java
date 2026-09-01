@@ -17,27 +17,55 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Pure unit test: IncidentRepository is mocked, no database involved.
+ */
 class CloseIncidentServiceTest {
+
+    private static final String AUTHORIZED_ROLE = "ROLE_MAINTENANCE_TECHNICIAN";
 
     private final IncidentRepository incidentRepository = mock(IncidentRepository.class);
     private final CloseIncidentService service = new CloseIncidentService(incidentRepository);
 
     @Test
-    void close_createdIncident_persistsClosedIncident() {
+    void close_authorizedActor_persistsClosedIncident() {
         Incident incident = newIncident("incident-1", IncidentStatus.CREATED);
         given(incidentRepository.findById("incident-1")).willReturn(Optional.of(incident));
 
-        Incident closed = service.close(new CloseIncidentCommand("incident-1"));
+        Incident closed = service.close(
+                new CloseIncidentCommand("incident-1", "overheating", "replaced sensor", AUTHORIZED_ROLE));
 
         assertThat(closed.status()).isEqualTo(IncidentStatus.CLOSED);
         verify(incidentRepository).update(closed);
     }
 
     @Test
+    void close_unauthorizedActor_throwsIncidentCloseForbiddenException() {
+        assertThatThrownBy(() -> service.close(
+                new CloseIncidentCommand("incident-1", "overheating", "replaced sensor", "ROLE_SUPERVISOR")))
+                .isInstanceOf(IncidentCloseForbiddenException.class);
+    }
+
+    @Test
+    void close_missingCause_throwsIllegalArgumentException() {
+        assertThatThrownBy(() -> service.close(
+                new CloseIncidentCommand("incident-1", " ", "replaced sensor", AUTHORIZED_ROLE)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void close_missingResolutionComment_throwsIllegalArgumentException() {
+        assertThatThrownBy(() -> service.close(
+                new CloseIncidentCommand("incident-1", "overheating", " ", AUTHORIZED_ROLE)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void close_unknownIncident_throwsIncidentNotFoundException() {
         given(incidentRepository.findById("missing")).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.close(new CloseIncidentCommand("missing")))
+        assertThatThrownBy(() -> service.close(
+                new CloseIncidentCommand("missing", "overheating", "replaced sensor", AUTHORIZED_ROLE)))
                 .isInstanceOf(IncidentNotFoundException.class);
     }
 
@@ -46,7 +74,8 @@ class CloseIncidentServiceTest {
         Incident incident = newIncident("incident-2", IncidentStatus.CLOSED);
         given(incidentRepository.findById("incident-2")).willReturn(Optional.of(incident));
 
-        assertThatThrownBy(() -> service.close(new CloseIncidentCommand("incident-2")))
+        assertThatThrownBy(() -> service.close(
+                new CloseIncidentCommand("incident-2", "overheating", "replaced sensor", AUTHORIZED_ROLE)))
                 .isInstanceOf(IncidentAlreadyClosedException.class);
     }
 

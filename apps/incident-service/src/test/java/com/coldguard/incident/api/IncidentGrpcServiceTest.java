@@ -1,14 +1,18 @@
 package com.coldguard.incident.api;
 
+import com.coldguard.incident.application.CloseIncidentService;
 import com.coldguard.incident.application.CreateIncidentService;
 import com.coldguard.incident.application.IncidentRepository;
 import com.coldguard.incident.domain.Incident;
+import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
+import com.coldguard.incident.grpc.v1.CloseIncidentResponse;
 import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.CreateIncidentResponse;
 import com.coldguard.incident.grpc.v1.Criticality;
 import com.coldguard.incident.grpc.v1.IncidentStatus;
 import com.coldguard.incident.grpc.v1.Magnitude;
 import com.coldguard.incident.grpc.v1.Priority;
+import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,16 +26,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Exercises the service method directly through a captured {@link StreamObserver}, without a
  * real gRPC transport. IncidentRepository is an in-memory fake, not the real persistence
- * adapter (see IncidentRepositoryAdapterTest for that).
+ * adapter (see IncidentRepositoryAdapterTest for that). closeIncident() reads the actor role from
+ * gRPC Context (populated by ActorRoleServerInterceptor in production, not run here), so tests
+ * set it explicitly via Context.current().withValue(...).
  */
 class IncidentGrpcServiceTest {
 
+    private static final String AUTHORIZED_ROLE = "ROLE_MAINTENANCE_TECHNICIAN";
+
+    private InMemoryIncidentRepository repository;
     private IncidentGrpcService grpcService;
 
     @BeforeEach
     void setUp() {
+        repository = new InMemoryIncidentRepository();
         grpcService = new IncidentGrpcService(
-                new CreateIncidentService(new InMemoryIncidentRepository()), new IncidentGrpcExceptionHandler());
+                new CreateIncidentService(repository),
+                new CloseIncidentService(repository),
+                new IncidentGrpcExceptionHandler());
     }
 
     @Test
@@ -45,7 +57,7 @@ class IncidentGrpcServiceTest {
                 .setPersistent(true)
                 .setCorrelationId("corr-1")
                 .build();
-        CapturingObserver observer = new CapturingObserver();
+        CapturingObserver<CreateIncidentResponse> observer = new CapturingObserver<>();
 
         grpcService.createIncident(request, observer);
 
@@ -68,8 +80,8 @@ class IncidentGrpcServiceTest {
                 .setPersistent(false)
                 .setCorrelationId("corr-1")
                 .build();
-        grpcService.createIncident(request, new CapturingObserver());
-        CapturingObserver secondObserver = new CapturingObserver();
+        grpcService.createIncident(request, new CapturingObserver<>());
+        CapturingObserver<CreateIncidentResponse> secondObserver = new CapturingObserver<>();
 
         grpcService.createIncident(request, secondObserver);
 
@@ -92,13 +104,84 @@ class IncidentGrpcServiceTest {
                 .setAnomalyType("high-temperature")
                 .setMagnitude(Magnitude.MAGNITUDE_MEDIUM)
                 .build();
-        CapturingObserver observer = new CapturingObserver();
+        CapturingObserver<CreateIncidentResponse> observer = new CapturingObserver<>();
 
         grpcService.createIncident(request, observer);
 
         assertThat(observer.response).isNull();
         assertThat(observer.error).isNotNull();
         assertThat(Status.fromThrowable(observer.error).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+    }
+
+    @Test
+    void closeIncident_authorizedActor_returnsClosedIncident() throws Exception {
+        Incident incident = newStoredIncident("incident-1");
+        CloseIncidentRequest request = CloseIncidentRequest.newBuilder()
+                .setIncidentId(incident.id())
+                .setCause("overheating")
+                .setResolutionComment("replaced sensor")
+                .build();
+        CapturingObserver<CloseIncidentResponse> observer = new CapturingObserver<>();
+
+        withActorRole(AUTHORIZED_ROLE, () -> grpcService.closeIncident(request, observer));
+
+        assertThat(observer.error).isNull();
+        assertThat(observer.response).isNotNull();
+        assertThat(observer.response.getStatus()).isEqualTo(IncidentStatus.CLOSED);
+        assertThat(observer.completed).isTrue();
+    }
+
+    @Test
+    void closeIncident_unauthorizedActor_returnsPermissionDenied() throws Exception {
+        Incident incident = newStoredIncident("incident-2");
+        CloseIncidentRequest request = CloseIncidentRequest.newBuilder()
+                .setIncidentId(incident.id())
+                .setCause("overheating")
+                .setResolutionComment("replaced sensor")
+                .build();
+        CapturingObserver<CloseIncidentResponse> observer = new CapturingObserver<>();
+
+        withActorRole("ROLE_SUPERVISOR", () -> grpcService.closeIncident(request, observer));
+
+        assertThat(observer.response).isNull();
+        assertThat(Status.fromThrowable(observer.error).getCode()).isEqualTo(Status.Code.PERMISSION_DENIED);
+    }
+
+    @Test
+    void closeIncident_unknownIncident_returnsNotFound() throws Exception {
+        CloseIncidentRequest request = CloseIncidentRequest.newBuilder()
+                .setIncidentId("missing")
+                .setCause("overheating")
+                .setResolutionComment("replaced sensor")
+                .build();
+        CapturingObserver<CloseIncidentResponse> observer = new CapturingObserver<>();
+
+        withActorRole(AUTHORIZED_ROLE, () -> grpcService.closeIncident(request, observer));
+
+        assertThat(observer.response).isNull();
+        assertThat(Status.fromThrowable(observer.error).getCode()).isEqualTo(Status.Code.NOT_FOUND);
+    }
+
+    private Incident newStoredIncident(String id) {
+        Incident incident = new Incident(
+                id, "asset-1", "sensor-1", "high-temperature",
+                com.coldguard.incident.domain.Impact.HIGH,
+                com.coldguard.incident.domain.Urgency.HIGH,
+                com.coldguard.incident.domain.Priority.P2,
+                com.coldguard.incident.domain.IncidentStatus.CREATED,
+                java.time.Instant.now());
+        repository.save(incident);
+        return incident;
+    }
+
+    private static void withActorRole(String role, Runnable runnable) throws Exception {
+        Context context = Context.current().withValue(ActorRoleServerInterceptor.ACTOR_ROLE_CONTEXT_KEY, role);
+        Context previous = context.attach();
+        try {
+            runnable.run();
+        } finally {
+            context.detach(previous);
+        }
     }
 
     private static final class InMemoryIncidentRepository implements IncidentRepository {
@@ -128,13 +211,13 @@ class IncidentGrpcServiceTest {
         }
     }
 
-    private static final class CapturingObserver implements StreamObserver<CreateIncidentResponse> {
-        private CreateIncidentResponse response;
+    private static final class CapturingObserver<T> implements StreamObserver<T> {
+        private T response;
         private Throwable error;
         private boolean completed;
 
         @Override
-        public void onNext(CreateIncidentResponse value) {
+        public void onNext(T value) {
             this.response = value;
         }
 

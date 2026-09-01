@@ -1,5 +1,8 @@
 package com.coldguard.incident.api;
 
+import com.coldguard.incident.application.IncidentCloseForbiddenException;
+import com.coldguard.incident.application.IncidentNotFoundException;
+import com.coldguard.incident.domain.IncidentAlreadyClosedException;
 import com.coldguard.incident.domain.IncidentAlreadyOpenException;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -28,6 +31,21 @@ public class IncidentGrpcExceptionHandler implements GrpcExceptionHandler {
         }
         if (exception instanceof IllegalArgumentException ex) {
             return Status.INVALID_ARGUMENT
+                    .withDescription(ex.getMessage())
+                    .asException();
+        }
+        if (exception instanceof IncidentNotFoundException ex) {
+            return Status.NOT_FOUND
+                    .withDescription(ex.getMessage())
+                    .asException();
+        }
+        if (exception instanceof IncidentAlreadyClosedException ex) {
+            return Status.FAILED_PRECONDITION
+                    .withDescription(ex.getMessage())
+                    .asException();
+        }
+        if (exception instanceof IncidentCloseForbiddenException ex) {
+            return Status.PERMISSION_DENIED
                     .withDescription(ex.getMessage())
                     .asException();
         }

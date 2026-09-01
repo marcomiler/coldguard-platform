@@ -7,6 +7,7 @@ option java_multiple_files = true;
 
 service IncidentService {
   rpc CreateIncident(CreateIncidentRequest) returns (CreateIncidentResponse);
+  rpc CloseIncident(CloseIncidentRequest) returns (CloseIncidentResponse);
 }
 
 enum Criticality {
@@ -72,4 +73,16 @@ message CreateIncidentResponse {
   Urgency urgency = 4;
   Priority priority = 5;
   string created_at = 6; // ISO-8601
+}
+
+message CloseIncidentRequest {
+  string incident_id = 1;
+  string cause = 2;
+  string resolution_comment = 3;
+}
+
+message CloseIncidentResponse {
+  string incident_id = 1;
+  IncidentStatus status = 2;
+  string closed_at = 3; // ISO-8601
 }

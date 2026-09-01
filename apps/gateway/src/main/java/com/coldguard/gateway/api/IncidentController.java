@@ -2,10 +2,13 @@ package com.coldguard.gateway.api;
 
 import com.coldguard.gateway.infrastructure.IncidentGrpcClient;
 import com.coldguard.gateway.infrastructure.InvalidIncidentRequestException;
+import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
+import com.coldguard.incident.grpc.v1.CloseIncidentResponse;
 import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.CreateIncidentResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +28,25 @@ public class IncidentController {
     public ResponseEntity<CreateIncidentHttpResponse> createIncident(@RequestBody CreateIncidentHttpRequest request) {
         CreateIncidentResponse grpcResponse = incidentGrpcClient.createIncident(toGrpcRequest(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(toHttpResponse(grpcResponse));
+    }
+
+    @PostMapping("/{incidentId}/close")
+    public ResponseEntity<CloseIncidentHttpResponse> closeIncident(
+            @PathVariable String incidentId, @RequestBody CloseIncidentHttpRequest request) {
+        CloseIncidentResponse grpcResponse = incidentGrpcClient.closeIncident(toGrpcCloseRequest(incidentId, request));
+        return ResponseEntity.ok(toCloseHttpResponse(grpcResponse));
+    }
+
+    private static CloseIncidentRequest toGrpcCloseRequest(String incidentId, CloseIncidentHttpRequest request) {
+        return CloseIncidentRequest.newBuilder()
+                .setIncidentId(incidentId)
+                .setCause(request.cause() == null ? "" : request.cause())
+                .setResolutionComment(request.resolutionComment() == null ? "" : request.resolutionComment())
+                .build();
+    }
+
+    private static CloseIncidentHttpResponse toCloseHttpResponse(CloseIncidentResponse response) {
+        return new CloseIncidentHttpResponse(response.getIncidentId(), response.getStatus(), response.getClosedAt());
     }
 
     private static CreateIncidentRequest toGrpcRequest(CreateIncidentHttpRequest request) {

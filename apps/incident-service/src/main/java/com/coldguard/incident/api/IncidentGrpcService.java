@@ -1,5 +1,7 @@
 package com.coldguard.incident.api;
 
+import com.coldguard.incident.application.CloseIncidentCommand;
+import com.coldguard.incident.application.CloseIncidentService;
 import com.coldguard.incident.application.CreateIncidentCommand;
 import com.coldguard.incident.application.CreateIncidentService;
 import com.coldguard.incident.domain.Criticality;
@@ -9,6 +11,8 @@ import com.coldguard.incident.domain.Incident;
 import com.coldguard.incident.domain.Magnitude;
 import com.coldguard.incident.domain.Priority;
 import com.coldguard.incident.domain.Urgency;
+import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
+import com.coldguard.incident.grpc.v1.CloseIncidentResponse;
 import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.CreateIncidentResponse;
 import com.coldguard.incident.grpc.v1.IncidentServiceGrpc;
@@ -16,6 +20,7 @@ import io.grpc.stub.StreamObserver;
 import org.slf4j.MDC;
 import org.springframework.grpc.server.service.GrpcService;
 
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -27,11 +32,14 @@ public class IncidentGrpcService extends IncidentServiceGrpc.IncidentServiceImpl
     private static final String CORRELATION_ID_MDC_KEY = "correlationId";
 
     private final CreateIncidentService createIncidentService;
+    private final CloseIncidentService closeIncidentService;
     private final IncidentGrpcExceptionHandler exceptionHandler;
 
     public IncidentGrpcService(CreateIncidentService createIncidentService,
+            CloseIncidentService closeIncidentService,
             IncidentGrpcExceptionHandler exceptionHandler) {
         this.createIncidentService = createIncidentService;
+        this.closeIncidentService = closeIncidentService;
         this.exceptionHandler = exceptionHandler;
     }
 
@@ -55,6 +63,35 @@ public class IncidentGrpcService extends IncidentServiceGrpc.IncidentServiceImpl
                 MDC.remove(CORRELATION_ID_MDC_KEY);
             }
         }
+    }
+
+    @Override
+    public void closeIncident(CloseIncidentRequest request,
+            StreamObserver<CloseIncidentResponse> responseObserver) {
+        try {
+            CloseIncidentCommand command = new CloseIncidentCommand(
+                    request.getIncidentId(),
+                    request.getCause(),
+                    request.getResolutionComment(),
+                    ActorRoleServerInterceptor.ACTOR_ROLE_CONTEXT_KEY.get());
+            Incident incident = closeIncidentService.close(command);
+            responseObserver.onNext(toCloseResponse(incident));
+            responseObserver.onCompleted();
+        } catch (RuntimeException ex) {
+            responseObserver.onError(exceptionHandler.handleException(ex));
+        }
+    }
+
+    /**
+     * closed_at is not persisted (Incident has no such column yet): it reflects this response's
+     * build time, not a stored timestamp. Re-querying the incident later cannot recover it.
+     */
+    private CloseIncidentResponse toCloseResponse(Incident incident) {
+        return CloseIncidentResponse.newBuilder()
+                .setIncidentId(incident.id())
+                .setStatus(toGrpcStatus(incident.status()))
+                .setClosedAt(DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
+                .build();
     }
 
     private CreateIncidentCommand toCommand(CreateIncidentRequest request) {
