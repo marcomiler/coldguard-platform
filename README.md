@@ -134,7 +134,7 @@ Para detenerlo manualmente cuando termines:
 docker compose -f deploy/local/docker-compose.yml stop postgres
 ```
 
-Esto conserva los datos (volumen `postgres-data`). No ejecutes `docker compose ... down -v`
+Esto conserva los datos (volumen `postgres-data`). No ejecutes `docker compose -f deploy/local/docker-compose.yml down -v`
 salvo que quieras borrar todos los datos locales.
 
 ### Correr tests (`deploy/scripts/run-tests.sh`)
