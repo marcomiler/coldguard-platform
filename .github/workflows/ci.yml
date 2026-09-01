@@ -8,6 +8,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: coldguard
+          POSTGRES_USER: coldguard
+          POSTGRES_PASSWORD: coldguard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U coldguard -d coldguard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -20,3 +34,6 @@ jobs:
 
       - name: Build and test
         run: mvn -B verify
+
+      - name: Integration tests (incident-service, PostgreSQL)
+        run: mvn -B -pl apps/incident-service -am test -DexcludedGroups=
