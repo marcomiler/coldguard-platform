@@ -55,6 +55,19 @@
       <artifactId>spring-security-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Already on the compile classpath transitively via spring-security-oauth2-jose (used by
+         JwtDecoders); declared explicitly for test code that signs real RS256 JWTs, so the test
+         issuer (com.coldguard.gateway.testsupport.TestJwtIssuer) doesn't rely on an undeclared
+         transitive dependency. Version pinned to 10.9.1 to match the one already resolved
+         transitively via spring-security-oauth2-jose:7.1.1 (verified with `mvn dependency:tree`;
+         not present in Spring Boot's own dependency-management BOM, so it can't be left
+         unversioned like the other dependencies in this file). -->
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+      <version>10.9.1</version>
+      <scope>test</scope>
+    </dependency>
     <!-- gRPC client only (Gateway calls IncidentService.CreateIncident); no server
          starter needed here (Gateway has no gRPC business logic of its own). -->
     <dependency>
