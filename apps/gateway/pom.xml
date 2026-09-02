@@ -74,6 +74,18 @@
       <groupId>org.springframework.grpc</groupId>
       <artifactId>spring-grpc-client-spring-boot-starter</artifactId>
     </dependency>
+    <!-- Test-only: generates ephemeral CA + leaf certificates in memory for the mTLS handshake
+         tests. The JDK has no public API to sign a leaf certificate with an
+         arbitrary CA (only to parse existing certificates), so a certificate-generation library
+         is strictly necessary; io.grpc:grpc-netty (already on the compile classpath transitively
+         via spring-grpc-core) uses the JDK's own TLS provider, no additional Netty/TLS dependency
+         needed. -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <version>1.79</version>
+      <scope>test</scope>
+    </dependency>
     <!-- In-process transport for testing the gRPC client adapter without a real server or
          network transport; version managed by the spring-grpc-dependencies BOM above. -->
     <dependency>
