@@ -9,6 +9,21 @@ spring:
       channels:
         incident-service:
           address: static://${INCIDENT_SERVICE_HOST:localhost}:${INCIDENT_SERVICE_GRPC_PORT:9090}
+          ssl:
+            enabled: true
+            # (mTLS): presents the Gateway's own certificate as a gRPC client and
+            # trusts only the local dev CA — negotiation-type is left at its default because
+            # Spring gRPC's channel-credentials provider only looks at ssl.enabled/ssl.bundle.
+            bundle: gateway-client
+  ssl:
+    bundle:
+      pem:
+        gateway-client:
+          keystore:
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/gateway/gateway.crt
+            private-key: file:${TLS_CERTS_DIR:../../deploy/local/certs}/gateway/gateway.key
+          truststore:
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/ca/ca.crt
 
 management:
   endpoints:

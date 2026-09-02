@@ -149,3 +149,89 @@ El modo `integration` requiere que `bootstrap.sh` (o el `docker compose up -d po
 arriba) ya esté corriendo; si no detecta el contenedor `coldguard-postgres` listo, falla con un
 mensaje indicando cómo levantarlo. El script no levanta PostgreSQL por sí mismo ni limpia nada al
 terminar.
+
+## mTLS local Gateway → Incident Service
+
+El canal gRPC interno entre Gateway e Incident Service exige mTLS en el stack local: Incident
+Service solo acepta llamadas de un cliente que presente un certificado firmado por la CA de
+desarrollo, y el Gateway confía únicamente en esa misma CA para validar el certificado del
+servidor. El puerto gRPC (9090) sigue sin exponerse al host.
+
+### Prerrequisitos
+
+`openssl` (para generar los certificados), Docker y Docker Compose, JDK 25, Maven 4.1+. `openssl`
+suele venir preinstalado en Linux/macOS; en Windows usar WSL2.
+
+### Generar los certificados de desarrollo
+
+```bash
+deploy/scripts/generate-dev-certs.sh
+```
+
+Genera una CA local autofirmada y dos certificados hoja (Gateway como cliente, Incident Service
+como servidor con SANs `incident-service`, `localhost`, `host.docker.internal` y `127.0.0.1`) bajo
+`deploy/local/certs/` — un directorio **no versionado** (ver `.gitignore`). El script falla de
+inmediato si `openssl` no está disponible, y **no sobrescribe** certificados ya generados salvo que
+se le pase `--force`.
+
+### Arranque
+
+```bash
+deploy/scripts/generate-dev-certs.sh   # solo la primera vez
+docker compose -f deploy/local/docker-compose.yml up -d --build postgres rabbitmq incident-service gateway
+```
+
+`mvn clean verify` también depende de que estos certificados ya existan: los tests de contexto
+completo (`GatewayApplicationTests`, `IncidentServiceApplicationTests`) arrancan el gRPC real con
+TLS y necesitan los archivos en `deploy/local/certs/` (por defecto, vía una ruta relativa que
+Maven resuelve desde la raíz de cada módulo). Antes de activar mTLS esto no era necesario porque el
+canal era texto plano — es un cambio de comportamiento real, no un accidente.
+
+### Regeneración explícita
+
+```bash
+deploy/scripts/generate-dev-certs.sh --force
+docker compose -f deploy/local/docker-compose.yml restart incident-service gateway
+```
+
+Regenerar invalida todos los certificados anteriores (nueva CA) — hace falta reiniciar ambos
+contenedores para que tomen los nuevos archivos.
+
+### Limpieza segura
+
+```bash
+rm -rf deploy/local/certs
+```
+
+Borra solo los certificados; no toca los volúmenes de datos (`postgres-data`, etc.) ni requiere
+`docker compose ... down -v`. Los contenedores dejarán de arrancar hasta volver a ejecutar
+`generate-dev-certs.sh`.
+
+### Advertencia
+
+Estos certificados son **exclusivamente de desarrollo local**: autofirmados, de vigencia larga,
+sin rotación ni revocación, y sus claves privadas quedan en texto plano en disco. Nunca deben
+usarse fuera de esta máquina ni tratarse como un modelo para un entorno real.
+
+### Prueba de stack real
+
+```bash
+deploy/scripts/test-mtls-stack.sh
+```
+
+Levanta el stack real con `--build`, espera los healthchecks, y confirma tres cosas contra el
+canal mTLS real (no simulado): (a) Gateway e Incident Service arrancan con TLS activo; (b) una
+petición `POST /api/v1/incidents` válida atraviesa el canal cifrado de punta a punta; (c) un
+cliente sin certificado, lanzado desde un contenedor efímero en la misma red Docker, es rechazado
+en el *handshake* TLS de Incident Service. No borra volúmenes al terminar.
+
+### Diferencia con los tests in-process (`MutualTlsHandshakeTest`)
+
+`apps/gateway/.../infrastructure/MutualTlsHandshakeTest.java` prueba la **lógica** del
+protocolo mTLS de forma aislada: genera una CA y certificados efímeros enteramente en memoria,
+levanta un servidor/cliente gRPC Netty reales pero sin Docker ni certificados en disco, y se
+ejecuta como parte normal de `mvn test`. No usa los certificados de `deploy/local/certs/` ni
+depende de que existan. `test-mtls-stack.sh`, en cambio, valida que la **configuración real**
+(`application.yml` + `docker-compose.yml` + certificados generados por
+`generate-dev-certs.sh`) funciona junta tal como la usaría un desarrollador — son
+complementarios, no intercambiables.

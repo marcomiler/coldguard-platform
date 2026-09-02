@@ -6,12 +6,20 @@ services:
     container_name: coldguard-gateway
     environment:
       SERVER_PORT: 8080
+      # (mTLS): must resolve to the Compose service name — it is also the SAN the
+      # Incident Service certificate was issued for (deploy/scripts/generate-dev-certs.sh).
+      INCIDENT_SERVICE_HOST: incident-service
+      TLS_CERTS_DIR: /certs
     ports:
       - "8080:8080"
+    volumes:
+      - ./certs:/certs:ro
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      incident-service:
         condition: service_healthy
 
   asset-service:
@@ -59,6 +67,22 @@ services:
       DB_NAME: ${POSTGRES_DB:-coldguard}
       DB_USER: ${POSTGRES_USER:-coldguard}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-coldguard}
+      TLS_CERTS_DIR: /certs
+    volumes:
+      - ./certs:/certs:ro
+    # gRPC (9090) stays intentionally unexposed to the host, mTLS or not — only the Actuator
+    # HTTP port (8083, not published either) is reachable from inside the container, which is
+    # exactly what this healthcheck uses.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'curl -sf http://localhost:8083/actuator/health | grep -q ''"status":"UP"''',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy

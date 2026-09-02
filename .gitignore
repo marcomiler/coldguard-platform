@@ -8,6 +8,10 @@ target/
 !.env.example
 !deploy/local/.env.example
 
+# Local mTLS development certificates — self-signed CA + leaf keys,
+# regenerated on demand by deploy/scripts/generate-dev-certs.sh, never committed
+deploy/local/certs/
+
 # Terraform state and local overrides never committed
 **/.terraform/
 *.tfstate
