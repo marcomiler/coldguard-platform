@@ -95,7 +95,7 @@ query($owner: String!, $repo: String!, $cursor: String) {
 def fetch_story_points(token):
     print("  📊 Consultando Story Points de GitHub Projects v2…")
     sp_map, cursor = {}, None
-    FIELD_NAMES = {"storypoints", "story_points", "points", "sp", "estimacion", "estimación", "puntos"}
+    FIELD_NAMES = {"storypoints", "story_points", "points", "sp", "estimacion", "estimación", "puntos", "estimate"}
 
     while True:
         r = requests.post(
