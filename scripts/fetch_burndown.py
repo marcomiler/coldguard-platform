@@ -81,6 +81,10 @@ query($owner: String!, $repo: String!, $cursor: String) {
                   number
                   field { ... on ProjectV2FieldCommon { name } }
                 }
+                ... on ProjectV2ItemFieldDateValue {
+                  date
+                  field { ... on ProjectV2FieldCommon { name } }
+                }
               }
             }
             content { ... on Issue { number } }
@@ -93,9 +97,10 @@ query($owner: String!, $repo: String!, $cursor: String) {
 """
 
 def fetch_story_points(token):
-    print("  📊 Consultando Story Points de GitHub Projects v2…")
-    sp_map, cursor = {}, None
-    FIELD_NAMES = {"storypoints", "story_points", "points", "sp", "estimacion", "estimación", "puntos", "estimate"}
+    print("  📊 Consultando Story Points y Start Dates de GitHub Projects v2…")
+    sp_map, start_map, cursor = {}, {}, None
+    SP_FIELDS   = {"storypoints","story_points","points","sp","estimacion","estimación","puntos","estimate"}
+    DATE_FIELDS = {"startdate","start_date","start","fechainicio","fecha_inicio"}
 
     while True:
         r = requests.post(
@@ -130,14 +135,16 @@ def fetch_story_points(token):
                     if not fv:
                         continue
                     fname = (fv.get("field") or {}).get("name", "").lower().replace(" ", "").replace("_", "")
-                    if fname in FIELD_NAMES:
+                    if fname in SP_FIELDS and "number" in fv:
                         sp_map[num] = int(fv.get("number") or 0)
+                    elif fname in DATE_FIELDS and "date" in fv:
+                        start_map[num] = fv.get("date")
 
         if not has_next:
             break
 
-    print(f"    → {len(sp_map)} issues con story points encontrados")
-    return sp_map
+    print(f"    → {len(sp_map)} issues con SP · {len(start_map)} issues con Start date")
+    return sp_map, start_map
 
 # ── Datos ──────────────────────────────────────────────────────────────────────
 def fetch_milestones(token):
@@ -158,8 +165,9 @@ def fetch_issues(milestone_number, token):
 def pdate(s):
     return datetime.strptime(s[:10], "%Y-%m-%d").date() if s else None
 
-def build_sprint(milestone, issues, sp_map):
-    start = pdate(milestone.get("created_at"))
+def build_sprint(milestone, issues, sp_map, start_map):
+    issue_starts = [pdate(start_map.get(i["number"])) for i in issues if start_map.get(i["number"])]
+    start = min(issue_starts) if issue_starts else pdate(milestone.get("created_at"))
     end   = pdate(milestone.get("due_on")) or start + timedelta(days=14)
     today = date.today()
 
@@ -489,7 +497,7 @@ def main():
         print("❌ No se encontraron milestones. Verifica que el token tenga el scope 'repo'.")
         sys.exit(1)
 
-    sp_map = fetch_story_points(token)
+    sp_map, start_map = fetch_story_points(token)
     if not sp_map:
         print("  ⚠  No se encontraron story points en GitHub Projects.")
         print("     Verifica que el token tenga el scope 'read:project'.")
@@ -500,7 +508,7 @@ def main():
         print(f"\n📌 Procesando: {ms['title']}")
         issues = fetch_issues(ms["number"], token)
         print(f"  → {len(issues)} issues encontradas")
-        data = build_sprint(ms, issues, sp_map)
+        data = build_sprint(ms, issues, sp_map, start_map)
         sprints.append(data)
         print(f"  → {data['total_points']} SP total · {data['completed_points']} completados · {data['remaining_points']} pendientes")
 
