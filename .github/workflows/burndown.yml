@@ -1,0 +1,43 @@
+name: Burndown Chart
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 6 * * *'   # cada día a las 6 AM UTC
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Generar burndown chart
+        run: |
+          python scripts/fetch_burndown.py ${{ secrets.BURNDOWN_TOKEN }}
+          mkdir dist
+          mv coldguard_burndown.html dist/index.html
+
+      - uses: actions/configure-pages@v4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
