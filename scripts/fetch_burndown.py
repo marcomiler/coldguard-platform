@@ -81,10 +81,6 @@ query($owner: String!, $repo: String!, $cursor: String) {
                   number
                   field { ... on ProjectV2FieldCommon { name } }
                 }
-                ... on ProjectV2ItemFieldDateValue {
-                  date
-                  field { ... on ProjectV2FieldCommon { name } }
-                }
               }
             }
             content { ... on Issue { number } }
@@ -97,10 +93,9 @@ query($owner: String!, $repo: String!, $cursor: String) {
 """
 
 def fetch_story_points(token):
-    print("  📊 Consultando Story Points y Start Dates de GitHub Projects v2…")
-    sp_map, start_map, cursor = {}, {}, None
-    SP_FIELDS   = {"storypoints","story_points","points","sp","estimacion","estimación","puntos","estimate"}
-    DATE_FIELDS = {"startdate","start_date","start","fechainicio","fecha_inicio"}
+    print("  📊 Consultando Story Points de GitHub Projects v2…")
+    sp_map, cursor = {}, None
+    FIELD_NAMES = {"storypoints", "story_points", "points", "sp", "estimacion", "estimación", "puntos", "estimate"}
 
     while True:
         r = requests.post(
@@ -135,16 +130,14 @@ def fetch_story_points(token):
                     if not fv:
                         continue
                     fname = (fv.get("field") or {}).get("name", "").lower().replace(" ", "").replace("_", "")
-                    if fname in SP_FIELDS and "number" in fv:
+                    if fname in FIELD_NAMES:
                         sp_map[num] = int(fv.get("number") or 0)
-                    elif fname in DATE_FIELDS and "date" in fv:
-                        start_map[num] = fv.get("date")
 
         if not has_next:
             break
 
-    print(f"    → {len(sp_map)} issues con SP · {len(start_map)} issues con Start date")
-    return sp_map, start_map
+    print(f"    → {len(sp_map)} issues con story points encontrados")
+    return sp_map
 
 # ── Datos ──────────────────────────────────────────────────────────────────────
 def fetch_milestones(token):
@@ -162,16 +155,33 @@ def fetch_issues(milestone_number, token):
     return [i for i in issues if "pull_request" not in i]
 
 # ── Burndown math ──────────────────────────────────────────────────────────────
+import re as _re
+
 def pdate(s):
     return datetime.strptime(s[:10], "%Y-%m-%d").date() if s else None
 
-def build_sprint(milestone, issues, sp_map, start_map):
-    issue_starts = [pdate(start_map.get(i["number"])) for i in issues if start_map.get(i["number"])]
-    start = min(issue_starts) if issue_starts else pdate(milestone.get("created_at"))
+def sp_from_labels(labels):
+    for label in labels:
+        name = label.get("name", "")
+        if name.lower().startswith("sp:"):
+            try:
+                return int(name.split(":")[1].strip())
+            except (ValueError, IndexError):
+                pass
+    return 0
+
+def build_sprint(milestone, issues, sp_map):
+    # Lee start date desde la descripción del milestone (pon "start: YYYY-MM-DD" en la descripción)
+    desc = milestone.get("description") or ""
+    m = _re.search(r'start\s*:\s*(\d{4}-\d{2}-\d{2})', desc, _re.IGNORECASE)
+    start = pdate(m.group(1)) if m else pdate(milestone.get("created_at"))
     end   = pdate(milestone.get("due_on")) or start + timedelta(days=14)
     today = date.today()
 
-    total = sum(sp_map.get(i["number"], 0) for i in issues)
+    def sp(issue):
+        return sp_map.get(issue["number"]) or sp_from_labels(issue.get("labels", []))
+
+    total = sum(sp(i) for i in issues)
 
     actual = []
     d = start
@@ -181,7 +191,7 @@ def build_sprint(milestone, issues, sp_map, start_map):
             if issue["state"] == "closed":
                 cd = pdate(issue.get("closed_at"))
                 if cd and cd <= d:
-                    rem -= sp_map.get(issue["number"], 0)
+                    rem -= sp(issue)
         actual.append({"date": d.isoformat(), "remaining": rem})
         d += timedelta(days=1)
 
@@ -208,7 +218,7 @@ def build_sprint(milestone, issues, sp_map, start_map):
         "ideal":            ideal,
         "issues": sorted(
             [{"number": i["number"], "title": i["title"], "state": i["state"],
-              "story_points": sp_map.get(i["number"], 0),
+              "story_points": sp(i),
               "closed_at": i.get("closed_at", "")[:10] if i.get("closed_at") else None}
              for i in issues],
             key=lambda x: (x["state"] != "closed", x["number"]),
@@ -497,7 +507,7 @@ def main():
         print("❌ No se encontraron milestones. Verifica que el token tenga el scope 'repo'.")
         sys.exit(1)
 
-    sp_map, start_map = fetch_story_points(token)
+    sp_map = fetch_story_points(token)
     if not sp_map:
         print("  ⚠  No se encontraron story points en GitHub Projects.")
         print("     Verifica que el token tenga el scope 'read:project'.")
@@ -508,7 +518,7 @@ def main():
         print(f"\n📌 Procesando: {ms['title']}")
         issues = fetch_issues(ms["number"], token)
         print(f"  → {len(issues)} issues encontradas")
-        data = build_sprint(ms, issues, sp_map, start_map)
+        data = build_sprint(ms, issues, sp_map)
         sprints.append(data)
         print(f"  → {data['total_points']} SP total · {data['completed_points']} completados · {data['remaining_points']} pendientes")
 
