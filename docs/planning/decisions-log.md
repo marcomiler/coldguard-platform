@@ -716,6 +716,66 @@ RNF-002, RNF-004, RNF-008; `docs/operations/observability-strategy.md`; HU-021.
 ### Trazabilidad
 RF-001, RF-010 a RF-013; CU-001, CU-011 a CU-014; RN-008; DEC-004.
 
+## DEC-021 — Estrategia técnica de implementación local
+**Fecha:** 2026-09-30
+**Estado:** Aprobada
+### Decisión
+- **Formato y análisis estático**: Spotless con `google-java-format` en modo `check`, ligado a
+  `verify` (quality gate de `CLAUDE.md`). La compatibilidad con Java 25 se verifica al implementar
+  SPEC-001; si fallara, se fija otra versión del formateador, no se desactiva el gate.
+- **Ramas**: una rama de feature por spec (`feat/spec-NNN-<slug>`); los commits de documentación
+  siguen la convención vigente de `git-workflow.md`. Un commit por spec como mínimo, mensajes en
+  inglés, sin push sin confirmación.
+- **Verificaciones técnicas** marcadas "pendiente de verificación" en los specs (reintentos de
+  Spring AMQP, OpenAPI, starter de OpenTelemetry, observación de Spring gRPC/AMQP, lectura del
+  certificado mTLS del par, imágenes de Mailpit/RabbitMQ): se resuelven con una prueba mínima al
+  inicio del spec correspondiente y el resultado se anota en este registro si cambia el diseño.
+### Trazabilidad
+RNF-005; `CLAUDE.md` (quality gates); `docs/specs/SPEC-001-plataforma-base.md`.
+
+## DEC-022 — Cierre de supuestos funcionales de los specs (rol de PO delegado)
+**Fecha:** 2026-09-30
+**Estado:** Aprobada como placeholder académico; el Product Owner puede revisarla
+### Contexto
+Los specs dejaron supuestos sin respaldo documental. El equipo delegó su cierre en una decisión
+tomada con criterio de viabilidad técnica. No son requisitos de negocio confirmados.
+### Decisión
+- **Sensor sin calibración inicial** (RN-018): el alta acepta una calibración inicial opcional. La
+  tarea de vencimiento solo evalúa sensores con al menos una calibración. Volver a ACTIVO desde
+  EN_MANTENIMIENTO o INACTIVO sí exige evidencia vigente.
+- **"Acción equivalente documentada"** (TODO de RN-018): la tarea programada ejecuta la transición a
+  EN_MANTENIMIENTO directamente, con actor de sistema `calibration-expiry-job`. El TODO deja de
+  aplicar.
+- **Persistencia de anomalías** (RN-005, RN-011): una condición es persistente con al menos
+  `min_consecutive` lecturas elegibles fuera de rango, consecutivas, del mismo tipo y dentro de
+  `window`. Una lectura elegible en rango reinicia la racha.
+- **Conectividad restablecida**: sin evento nuevo; se limpia la marca y se registra log de negocio
+  y métrica. La detección aplica solo a sensores ACTIVOS con al menos una lectura previa.
+- **SLA de P4**: reconocimiento en 1 día (sin calendario laboral en el MVP) y sin objetivo de
+  resolución, según `docs/quality/sla-kpi.md`.
+- **Recálculo de prioridad por cambio de criticidad del activo** (RN-014): fuera del MVP local. Sí
+  se recalcula por nuevas ocurrencias.
+- **Roles**: el Operador solo lee incidentes (no hay comando ni RF para sus acciones); el Auditor
+  solo consulta la bitácora (CU-009).
+- **Valores de demostración (placeholder académico, configurables)**:
+
+| Parámetro | Valor demo |
+|---|---|
+| Rango térmico del perfil de ejemplo | 2.0 a 8.0 °C |
+| Bandas de magnitud (desviación) | media ≥ 1.0, alta ≥ 3.0, crítica ≥ 6.0 °C |
+| Persistencia | 3 lecturas consecutivas en 5 minutos |
+| Intervalo esperado de lectura | 5 s; tolerancia de conectividad ×3 |
+| Validez de calibración por defecto | 90 días (demo de vencimiento con valor corto en el seed) |
+| Tarea de vencimiento de calibración | cada 5 minutos |
+| SLA de demo | tabla de `sla-kpi.md` (P1 5 min/30 min, P2 15 min/2 h, P3 1 h/8 h, P4 1 día) |
+| Tamaño máximo de página / lote de ingesta | 100 / 500 |
+### Consecuencias
+- Estos valores no se presentan como confirmados en documentación, demo ni pruebas.
+- Un cambio de PO sobre cualquiera solo afecta configuración o un DEC nuevo, no el diseño.
+### Trazabilidad
+RN-005, RN-011, RN-014, RN-018, RN-020; `docs/specs/SPEC-004`, `005`, `006`, `007`;
+DEC-015, DEC-018.
+
 ## Referencias a decisiones registradas en otros documentos
 
 Decisiones confirmadas posteriores al cierre de Sprint 1, documentadas en su lugar natural

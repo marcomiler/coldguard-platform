@@ -79,6 +79,13 @@ de codificar el slice afectado (`.claude/rules/architecture.md`, `.claude/rules/
 Cada spec lista además decisiones locales de menor alcance (p. ej. guards de D-04, modelado de
 persistencia RN-005, sensores sin calibración inicial, SLA P4) con su propuesta.
 
+## Estado de las decisiones
+
+D-01 a D-17 aprobadas y registradas: ADR-010, actualización de ADR-007 y DEC-015 a DEC-020. Los
+supuestos funcionales locales de cada spec y la estrategia técnica (formateador, ramas,
+verificaciones) quedaron cerrados en DEC-021 y DEC-022 (valores placeholder académico). Donde un
+spec dice "confirmar con el PO", rige DEC-022.
+
 ## Convenciones transversales (aplican a todos los specs)
 
 1. **Capas** (DEC-008, DEC-011): `api` (gRPC/REST, mapeo), `application` (casos de uso, puertos),

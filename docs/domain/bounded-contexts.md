@@ -38,7 +38,6 @@ de negocio ni agregación propia (ADR-008). No aparece en la tabla siguiente.
 
 ## Pendiente (no bloquea Sprint 1)
 
-- Si Notification Service necesita esquema propio (p. ej. para registrar estado de envío/reintentos
-  de forma persistente) no está confirmado en `container-diagram.md`; no se inventa aquí.
+- Esquema de Notification Service: resuelto (`notification`, DEC-012).
 - Eventos de los módulos Identity & Access y consultas operativas: no catalogados todavía
   (`docs/domain/commands-events.md`, TODO).

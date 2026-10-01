@@ -21,8 +21,9 @@ Trazabilidad: RF-005, RF-008; RN-003, RN-004, RN-005, RN-012; evento `IncidentCr
 
 El sistema notifica a los actores correspondientes según la política de notificación vigente
 (RF-008, eventos `NotificationRequested`/`NotificationFailed`, `docs/domain/commands-events.md`).
-**TODO**: no existe una matriz de notificación definida (qué actor recibe qué notificación en qué
-condición) — ver `docs/domain/traceability-matrix.md` (RF-008).
+Matriz de notificación: no confirmada por negocio. Placeholder académico vigente (DEC-018):
+`IncidentCreated` notifica a los Supervisores de operaciones habilitados; `IncidentEscalated` a los
+Técnicos de mantenimiento habilitados — ver `docs/domain/traceability-matrix.md` (RF-008).
 
 ## CU-004 Reconocer y coordinar atención de incidente
 Actor principal: Supervisor de operaciones.
@@ -88,8 +89,8 @@ Actor secundario: Supervisor de operaciones (consulta, dentro de sus funciones d
 operacional).
 Trazabilidad: RF-012; RN-001, RN-009.
 
-**TODO**: no hay un evento de dominio catalogado para "activo/sensor/perfil actualizado"
-(`docs/domain/commands-events.md` solo cataloga `AssetRegistered` para alta).
+Eventos: `AssetUpdated` y `OperationalProfileUpdated` (DEC-020, `docs/domain/commands-events.md`);
+el resto de cambios técnicos del sensor se auditan en `SensorLifecycleAudit`.
 
 Para el ciclo de vida operativo del sensor específicamente (estado, calibración, reasignación,
 retiro), ver los casos de uso especializados CU-017 a CU-020; para el historial técnico y
@@ -100,7 +101,7 @@ datos de activos, sensores y perfiles, no esas operaciones específicas.
 Actor: Administrador de plataforma.
 Trazabilidad: RF-013; RN-008 (toda asignación de acceso es una transición auditable).
 
-**TODO**: no hay un evento de dominio catalogado para esta operación.
+Evento: `UserAccessAssignmentChanged` (DEC-020, `docs/domain/commands-events.md`).
 
 ## CU-015 Inyectar telemetría de prueba
 Actor principal: Administrador de plataforma.

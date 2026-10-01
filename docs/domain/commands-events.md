@@ -6,9 +6,9 @@ evento, no un diseño de base de datos ni un contrato serializado final.
 | Evento | Productor | Consumidor / propósito | CU / RF / RN asociado | Payload conceptual |
 |---|---|---|---|---|
 | `AssetRegistered` | Asset Service (CU-001, CU-012) | Sin consumidor confirmado; asociado explícitamente a CU-001 (alta de unidad) | RF-001, RF-011; CU-001, CU-012 | Identificador de activo, criticidad |
-| `TelemetryReceived` | Telemetry Service, a partir de CU-002 (sensor-simulator) o CU-015 (endpoint de pruebas, RN-015) | Telemetry Service — evalúa contra el perfil operativo | RF-003, RF-014; CU-002, CU-015; RN-002 | Sensor, activo, timestamp de origen, valor, unidad, datos de correlación |
+| `TelemetryReceived` | Telemetry Service, a partir de CU-002 (sensor-simulator) o CU-015 (endpoint de pruebas, RN-015) | Telemetry Service — evalúa contra el perfil operativo. Evento interno: no se publica en RabbitMQ (DEC-016) | RF-003, RF-014; CU-002, CU-015; RN-002 | Sensor, activo, timestamp de origen, valor, unidad, datos de correlación |
 | `TelemetryThresholdBreached` | Telemetry Service | Incident Service — puede originar `IncidentCreated` | RF-004; CU-002; RN-001, RN-002 | Sensor, activo, magnitud de la desviación, timestamp |
-| `SensorConnectivityLost` | Sistema (CU-022, detección por ausencia de telemetría esperada) | Monitoreo/operación — visibilidad y auditoría; **no** crea un incidente térmico | RF-017; CU-022; RN-020 | Sensor, activo, última lectura recibida, frecuencia esperada configurada |
+| `SensorConnectivityLost` | Telemetry Service, como proceso de sistema (CU-022, detección por ausencia de telemetría esperada; DEC-016) | Monitoreo/operación — visibilidad y auditoría; **no** crea un incidente térmico | RF-017; CU-022; RN-020 | Sensor, activo, última lectura recibida, frecuencia esperada configurada |
 | `IncidentCreated` | Incident Service (CU-003) | Notification Service (notificación inicial); inicia el reloj de SLA (RN-006) | RF-005; CU-003; RN-003, RN-004, RN-005, RN-012 | Incidente, activo, sensor, severidad, impacto, urgencia, prioridad |
 | `IncidentAcknowledged` | Incident Service, a partir de CU-004 (Supervisor de operaciones reconoce) | Detiene el reloj de reconocimiento (RN-006) | RF-006; CU-004; RN-006 | Incidente, usuario responsable, timestamp |
 | `IncidentEscalated` | Incident Service, a partir de CU-005 (Supervisor de operaciones solicita/confirma; el Sistema registra la transición) | Notification Service — notifica al Técnico de mantenimiento | RF-007; CU-005; RN-012, RN-014 | Incidente, usuario que solicita/confirma, timestamp |
@@ -20,6 +20,9 @@ evento, no un diseño de base de datos ni un contrato serializado final.
 | `SensorCalibrationRecorded` | Asset Service (CU-019) | `CalibrationOrVerificationRecord` (CU-019, CU-021); evidencia para el retorno a ACTIVO (RN-018, vía CU-017) | RF-016; CU-019; RN-018 | Sensor, usuario responsable, motivo, timestamp |
 | `SensorCalibrationExpired` | Sistema (tarea programada de vencimiento de calibración, RN-018) | Dispara o documenta la transición a EN_MANTENIMIENTO (CU-017) | RF-016; RN-018 | Sensor, timestamp de vencimiento detectado |
 | `SensorRetired` | Asset Service (CU-020) | `SensorLifecycleAudit` (CU-021); el sensor deja de generar lecturas elegibles | RF-016; CU-020; RN-017 | Sensor, usuario responsable, motivo, timestamp |
+| `AssetUpdated` | Asset Service (CU-013, CU-012) | Audit Log; invalidación de caché en Telemetry Service (DEC-017) | RF-012, RF-011; CU-013, CU-012; RN-008, RN-009 | Activo, campos cambiados, valores anterior/posterior |
+| `OperationalProfileUpdated` | Asset Service (CU-011, CU-013) | Audit Log; invalidación de caché en Telemetry Service (DEC-017) | RF-010, RF-012; CU-011, CU-013; RN-001, RN-008 | Sensor, versión del perfil, valores anterior/posterior |
+| `UserAccessAssignmentChanged` | Incident Service, módulo Identity & Access (CU-014) | Audit Log (escritura in-process); sin consumidor externo | RF-013; CU-014; RN-008 | Usuario, rol, acción (asignar/revocar/habilitar), usuario responsable, motivo |
 
 ## Notas
 
@@ -36,7 +39,15 @@ evento, no un diseño de base de datos ni un contrato serializado final.
 
 - Periodicidad/frecuencia esperada configurable que determina cuándo se considera "pérdida de
   conectividad" (RN-020): pendiente de definir, sin fijar un valor numérico.
-- Eventos pendientes de definir para gestión de asignaciones de acceso (CU-014) y autenticación
-  (CU-016): no catalogados.
-- Payload físico/serializado final (formato de mensaje, versión de contrato) de cada evento: no
-  definido aquí; corresponde a diseño técnico posterior.
+- Eventos de autenticación (CU-016): no catalogados; el login no es una transición de negocio
+  auditable en el MVP. Los de asignación de acceso y actualización de activos/perfiles quedaron
+  catalogados arriba (DEC-020).
+- Frecuencia esperada y criterio de vencimiento: valores de demostración como placeholder
+  académico (DEC-022), sin cifra de negocio confirmada.
+
+## Formato físico
+
+Definido en `docs/specs/SPEC-002-contratos.md`: envelope JSON versionado (`eventVersion`),
+exchange `coldguard.events` (topic), routing key `<contexto>.<evento-en-kebab>`, un JSON Schema
+por evento en `contracts/events/` (pendiente de crear) y publicación vía Transactional Outbox
+(ADR-009). Es diseño decidido, aún no implementado.

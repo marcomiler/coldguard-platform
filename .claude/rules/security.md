@@ -1,12 +1,15 @@
-- Target design: JWT + Spring Security, RBAC by actor role (ADR-007). **Current state: not
-  implemented** — `apps/gateway/src` has no JWT filter or Spring Security configuration yet, only
-  empty package placeholders; real implementation is scoped to Sprint 4
-  (`docs/planning/roadmap.md`). Do not write or review code as if edge JWT validation already
-  runs.
+- Target design: JWT + Spring Security, RBAC by actor role (ADR-007). **Current state: partial.**
+  `apps/gateway` has Spring Security with a resource-server JWT converter, but only
+  `POST /api/v1/incidents/*/close` is protected and the decoder fails closed because no issuer is
+  configured; there is no login, no user store and no RBAC for the other routes. The full
+  implementation is specified in `docs/specs/SPEC-004-identidad-seguridad.md` (deny-by-default
+  RBAC table). Do not write or review code as if edge JWT validation already covers the API.
 - The Gateway is the sole component that validates the JWT at the edge (ADR-008). The propagation
-  mechanism to internal services is **not yet decided** — ADR-007 leaves it open ("vía metadata
-  gRPC... o revalidan el token según se defina en implementación"). Until a mechanism is chosen:
-  internal services must never parse or trust a raw `Authorization` header themselves — that
+  mechanism is **decided** (ADR-007, third update): the Gateway sends `x-actor-id` and
+  `x-actor-roles` as gRPC metadata over mTLS, and internal services accept it only from the
+  `gateway` client identity (target design; today only the interim `x-actor-role` metadata for
+  the close endpoint exists). Internal services must never parse or trust a raw `Authorization`
+  header themselves — that
   re-implements edge auth regardless of which mechanism is eventually picked.
 - Never log secrets, tokens, or credentials — in code, telemetry, traces, or business events
   (RNF-008).

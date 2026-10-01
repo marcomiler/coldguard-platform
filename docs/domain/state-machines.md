@@ -2,14 +2,32 @@
 
 ## Incidente
 
-> TODO: no existe un diagrama formal de estados del incidente en el árbol original. Las
-> transiciones ya conocidas por las reglas de negocio (`docs/product/business-rules.md`) y los
-> eventos (`docs/domain/commands-events.md`) son: creado (`IncidentCreated`) → reconocido
-> (`IncidentAcknowledged`) → escalado (`IncidentEscalated`, opcional/recurrente) → cerrado
-> (`IncidentClosed`). `IncidentClosed` es el único evento de cierre técnico de incidente en el MVP
-> (no existe `IncidentResolved` como estado o transición distinta). No se formaliza aquí como
-> máquina de estados completa (guards, transiciones inválidas) para no inventar reglas no
-> confirmadas.
+Formalizada por DEC-015 (amplía DEC-013). Estados: `CREATED`, `ACKNOWLEDGED`, `ESCALATED`,
+`CLOSED`. "Abierto" (RN-004) es cualquier estado distinto de `CLOSED`. `IncidentClosed` es el
+único evento de cierre técnico (no existe `IncidentResolved`).
+
+```mermaid
+stateDiagram-v2
+  [*] --> CREATED: IncidentCreated
+  CREATED --> ACKNOWLEDGED: reconocer (CU-004)
+  CREATED --> ESCALATED: escalar (CU-005)
+  ACKNOWLEDGED --> ESCALATED: escalar (CU-005)
+  ESCALATED --> ESCALATED: escalar de nuevo (CU-005)
+  CREATED --> CLOSED: cerrar (CU-006)
+  ACKNOWLEDGED --> CLOSED: cerrar (CU-006)
+  ESCALATED --> CLOSED: cerrar (CU-006)
+  CLOSED --> [*]
+```
+
+| Transición | Guard | Regla |
+|---|---|---|
+| Reconocer | Una sola vez, incidente abierto; rol Supervisor de operaciones. Si ya está `ESCALATED` conserva ese estado y solo registra `acknowledged_at` | RN-006 |
+| Escalar | Incidente abierto, repetible, motivo obligatorio; rol Supervisor de operaciones; nunca automático por SLA | RN-012, RN-014 |
+| Cerrar | Incidente abierto, causa y comentario de resolución, rol Técnico de mantenimiento; no exige reconocimiento previo (queda fuera de MTTA) | RN-007, RN-019 |
+| `CLOSED` → cualquier otro | No permitido | — |
+
+Una nueva anomalía equivalente sobre un incidente abierto no cambia el estado: incrementa el
+contador de ocurrencias y puede recalcular la prioridad, siempre auditado (RN-005, RN-014).
 
 ## Sensor
 
