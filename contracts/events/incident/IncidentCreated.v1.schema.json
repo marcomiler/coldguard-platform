@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/incident/IncidentCreated.v1.schema.json",
+  "title": "IncidentCreated v1",
+  "description": "An incident was created from an anomaly; the SLA clock starts.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "IncidentCreated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "incident-service"
+    },
+    "aggregateType": {
+      "const": "Incident"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "incidentId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "anomalyType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
+          ]
+        },
+        "urgency": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "IMMEDIATE"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "P1",
+            "P2",
+            "P3",
+            "P4"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ackDueAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolveDueAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "incidentId",
+        "assetId",
+        "sensorId",
+        "anomalyType",
+        "impact",
+        "urgency",
+        "priority",
+        "createdAt",
+        "ackDueAt"
+      ]
+    }
+  }
+}

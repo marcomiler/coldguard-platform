@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/asset/AssetUpdated.v1.schema.json",
+  "title": "AssetUpdated v1",
+  "description": "Asset data or criticality changed. previous/current hold only the changed fields.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "AssetUpdated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "asset-service"
+    },
+    "aggregateType": {
+      "const": "Asset"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "changedFields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "previous": {
+          "type": "object"
+        },
+        "current": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "assetId",
+        "changedFields",
+        "previous",
+        "current"
+      ]
+    }
+  }
+}

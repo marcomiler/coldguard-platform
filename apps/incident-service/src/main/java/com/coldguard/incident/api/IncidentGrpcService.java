@@ -22,9 +22,10 @@ import java.time.format.DateTimeFormatter;
 import org.springframework.grpc.server.service.GrpcService;
 
 /**
- * gRPC endpoint for incident creation and closing (contracts/grpc/incident_service.proto).
- * Exceptions are mapped to gRPC statuses by the registered {@link IncidentGrpcExceptionHandler};
- * the correlation id is placed in the MDC by the shared server interceptor.
+ * gRPC endpoint for incident creation and closing
+ * (contracts/grpc/incident/v1/incident_service.proto). Exceptions are mapped to gRPC statuses by
+ * the registered {@link IncidentGrpcExceptionHandler}; the correlation id is placed in the MDC by
+ * the shared server interceptor.
  */
 @GrpcService
 public class IncidentGrpcService extends IncidentServiceGrpc.IncidentServiceImplBase {

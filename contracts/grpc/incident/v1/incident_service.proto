@@ -2,12 +2,21 @@ syntax = "proto3";
 
 package com.coldguard.incident.v1;
 
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
 option java_package = "com.coldguard.incident.grpc.v1";
 option java_multiple_files = true;
 
+// The actor of every call is never a request field: the Gateway sends the validated identity as
+// gRPC metadata (x-actor-id, x-actor-roles) over mTLS.
 service IncidentService {
   rpc CreateIncident(CreateIncidentRequest) returns (CreateIncidentResponse);
   rpc CloseIncident(CloseIncidentRequest) returns (CloseIncidentResponse);
+  rpc AcknowledgeIncident(AcknowledgeIncidentRequest) returns (IncidentView);
+  rpc EscalateIncident(EscalateIncidentRequest) returns (IncidentView);
+  rpc GetIncident(GetIncidentRequest) returns (IncidentView);
+  rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse);
 }
 
 enum Criticality {
@@ -54,6 +63,8 @@ enum IncidentStatus {
   INCIDENT_STATUS_UNSPECIFIED = 0;
   CREATED = 1;
   CLOSED = 2;
+  ACKNOWLEDGED = 3;
+  ESCALATED = 4;
 }
 
 message CreateIncidentRequest {
@@ -85,4 +96,57 @@ message CloseIncidentResponse {
   string incident_id = 1;
   IncidentStatus status = 2;
   string closed_at = 3; // ISO-8601
+}
+
+message AcknowledgeIncidentRequest {
+  string incident_id = 1;
+  string note = 2;
+}
+
+message EscalateIncidentRequest {
+  string incident_id = 1;
+  string reason = 2; // required
+}
+
+message GetIncidentRequest {
+  string incident_id = 1;
+}
+
+message ListIncidentsRequest {
+  repeated IncidentStatus statuses = 1;
+  repeated Priority priorities = 2;
+  string asset_id = 3;
+  string sensor_id = 4;
+  google.protobuf.Timestamp created_from = 5;
+  google.protobuf.Timestamp created_to = 6;
+  com.coldguard.common.v1.PageRequest page = 7;
+}
+
+message ListIncidentsResponse {
+  repeated IncidentView incidents = 1;
+  com.coldguard.common.v1.PageInfo page = 2;
+}
+
+message IncidentView {
+  string incident_id = 1;
+  IncidentStatus status = 2;
+  string asset_id = 3;
+  string sensor_id = 4;
+  string anomaly_type = 5;
+  Impact impact = 6;
+  Urgency urgency = 7;
+  Priority priority = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp ack_due_at = 10;
+  google.protobuf.Timestamp resolve_due_at = 11; // unset when the priority has no resolution target
+  google.protobuf.Timestamp acknowledged_at = 12;
+  string acknowledged_by = 13;
+  google.protobuf.Timestamp last_escalated_at = 14;
+  int32 escalation_count = 15;
+  google.protobuf.Timestamp closed_at = 16;
+  string closed_by = 17;
+  string cause = 18;
+  string resolution_comment = 19;
+  int32 occurrence_count = 20;
+  google.protobuf.Timestamp last_occurrence_at = 21;
 }

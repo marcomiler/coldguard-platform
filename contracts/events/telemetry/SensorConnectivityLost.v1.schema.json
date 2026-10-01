@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/telemetry/SensorConnectivityLost.v1.schema.json",
+  "title": "SensorConnectivityLost v1",
+  "description": "No telemetry arrived within the expected interval. Does not create an incident.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "SensorConnectivityLost"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "telemetry-service"
+    },
+    "aggregateType": {
+      "const": "Sensor"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "lastReadingAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expectedIntervalSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "detectedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "sensorId",
+        "assetId",
+        "lastReadingAt",
+        "expectedIntervalSeconds",
+        "detectedAt"
+      ]
+    }
+  }
+}
