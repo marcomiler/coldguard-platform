@@ -21,9 +21,24 @@
 
   <properties>
     <java.version>25</java.version>
+    <!-- Resolved empirically via `mvn dependency:tree` against the spring-grpc-dependencies BOM
+         below; kept in sync with it so the protoc/protoc-gen-grpc-java build-time plugins match
+         the runtime library versions. -->
+    <spring-grpc.version>1.0.3</spring-grpc.version>
+    <grpc.version>1.77.1</grpc.version>
+    <protobuf.version>4.33.4</protobuf.version>
+    <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
+    <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
+    <spotless.version>3.10.3</spotless.version>
+    <google-java-format.version>1.36.1</google-java-format.version>
+    <!-- Referenced via ${excludedGroups} (not hardcoded) so it stays overridable from the command
+         line, e.g. `mvn test -DexcludedGroups=` to include integration tests that need a real
+         PostgreSQL. -->
+    <excludedGroups>integration</excludedGroups>
   </properties>
 
   <modules>
+    <module>libs/coldguard-commons</module>
     <module>apps/gateway</module>
     <module>apps/asset-service</module>
     <module>apps/telemetry-service</module>
@@ -31,6 +46,9 @@
     <module>apps/notification-service</module>
   </modules>
 
+  <!-- Only dependencies used by every service module without exception are declared in
+       <dependencies>. Anything module-specific (gRPC, JPA, security...) stays in that module's own
+       pom. -->
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -50,4 +68,106 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Spring gRPC BOM: supports Spring Boot 4.1.x per its own reference docs. -->
+      <dependency>
+        <groupId>org.springframework.grpc</groupId>
+        <artifactId>spring-grpc-dependencies</artifactId>
+        <version>${spring-grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.coldguard</groupId>
+        <artifactId>coldguard-commons</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <extensions>
+      <!-- Detects os.detected.classifier so protoc/protoc-gen-grpc-java download the right native
+           executable for this machine (standard grpc-java Maven pattern). -->
+      <extension>
+        <groupId>kr.motd.maven</groupId>
+        <artifactId>os-maven-plugin</artifactId>
+        <version>${os-maven-plugin.version}</version>
+      </extension>
+    </extensions>
+
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <!-- Compiles contracts/grpc/**/*.proto (shared monorepo source) into each module's own
+               generated sources. Modules that need stubs only declare the plugin, no config. -->
+          <groupId>org.xolstice.maven.plugins</groupId>
+          <artifactId>protobuf-maven-plugin</artifactId>
+          <version>${protobuf-maven-plugin.version}</version>
+          <configuration>
+            <protoSourceRoot>${project.basedir}/../../contracts/grpc</protoSourceRoot>
+            <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+            <pluginId>grpc-java</pluginId>
+            <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>compile</goal>
+                <goal>compile-custom</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <!-- Excludes tests tagged "integration" (real PostgreSQL required) from the default
+               `mvn test` run. -->
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <excludedGroups>${excludedGroups}</excludedGroups>
+          </configuration>
+        </plugin>
+        <plugin>
+          <!-- spring-boot-maven-plugin stays declared per runnable module (not here) so library
+               modules such as libs/coldguard-commons are not repackaged as executable jars. -->
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <!-- Formatting gate. `check` is bound to `verify`; run `mvn spotless:apply` to format.
+             Skip temporarily with -Dspotless.check.skip=true. -->
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+            </includes>
+            <googleJavaFormat>
+              <version>${google-java-format.version}</version>
+              <style>GOOGLE</style>
+            </googleJavaFormat>
+            <removeUnusedImports/>
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

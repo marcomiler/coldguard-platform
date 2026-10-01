@@ -1,9 +1,15 @@
 server:
   port: 8084
+  shutdown: graceful
 
 spring:
   application:
     name: notification-service
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
   datasource:
     # No logical schema name is fixed yet: bounded-contexts.md does not confirm one for
     # Notification Service. Points at the default schema until that ownership is decided.

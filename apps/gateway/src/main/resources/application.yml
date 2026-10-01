@@ -1,14 +1,20 @@
 server:
   port: 8080
+  shutdown: graceful
 
 spring:
   application:
     name: gateway
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
   grpc:
     client:
       channels:
         incident-service:
-          address: static://${INCIDENT_SERVICE_HOST:localhost}:${INCIDENT_SERVICE_GRPC_PORT:9090}
+          address: static://${INCIDENT_SERVICE_HOST:localhost}:${INCIDENT_SERVICE_GRPC_PORT:9093}
           ssl:
             enabled: true
             # (mTLS): presents the Gateway's own certificate as a gRPC client and
@@ -26,6 +32,10 @@ spring:
             certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/ca/ca.crt
 
 management:
+  server:
+    # Separate port so actuator is reachable inside the Compose network but is not part of the
+    # public REST surface published on 8080.
+    port: ${MANAGEMENT_PORT:8090}
   endpoints:
     web:
       exposure:

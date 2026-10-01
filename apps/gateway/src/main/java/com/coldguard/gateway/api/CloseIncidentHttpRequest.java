@@ -1,4 +1,3 @@
 package com.coldguard.gateway.api;
 
-public record CloseIncidentHttpRequest(String cause, String resolutionComment) {
-}
+public record CloseIncidentHttpRequest(String cause, String resolutionComment) {}

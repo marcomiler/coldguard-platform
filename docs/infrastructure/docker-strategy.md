@@ -3,9 +3,10 @@
 El MVP corre localmente vía `deploy/local/docker-compose.yml` (`.claude/rules/infra.md`); no se
 requiere ningún servicio cloud para ejecutarlo. Comandos de arranque en
 `docs/operations/runbooks.md`. Este documento fija la estrategia de Docker Compose local
-(servicios, redes, volúmenes, variables de entorno) **sin implementarla todavía**: no se ha creado
-`deploy/local/docker-compose.yml`, ningún `Dockerfile`, ni se ha ejecutado `docker compose up` en
-este repositorio.
+(servicios, redes, volúmenes, variables de entorno). Implementado en SPEC-001: un `Dockerfile` por
+servicio con plantilla común, healthchecks de readiness, `depends_on` con `service_healthy`,
+imágenes de infraestructura con versión fija, límite de memoria por servicio Java y perfil
+`observability` opcional. El servicio `sensor-simulator` llega con SPEC-010.
 
 ## Servicios previstos
 
