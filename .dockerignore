@@ -1,0 +1,10 @@
+**/target
+.git
+.idea
+.vscode
+.env
+.env.*
+deploy/local/certs
+docs
+**/*.log
+**/*.pid

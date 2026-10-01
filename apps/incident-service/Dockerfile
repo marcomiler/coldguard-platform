@@ -1,22 +1,25 @@
+# Common template for every ColdGuard service image; only the module name differs.
+# Build context is the repository root (see deploy/local/docker-compose.yml).
 FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /workspace
+# The root reactor declares every module, so all POMs must be present for any single-module build.
 COPY pom.xml /workspace/pom.xml
+COPY libs/coldguard-commons/pom.xml /workspace/libs/coldguard-commons/pom.xml
 COPY apps/gateway/pom.xml /workspace/apps/gateway/pom.xml
 COPY apps/asset-service/pom.xml /workspace/apps/asset-service/pom.xml
 COPY apps/telemetry-service/pom.xml /workspace/apps/telemetry-service/pom.xml
 COPY apps/incident-service/pom.xml /workspace/apps/incident-service/pom.xml
 COPY apps/notification-service/pom.xml /workspace/apps/notification-service/pom.xml
 COPY contracts /workspace/contracts
+COPY libs/coldguard-commons/src /workspace/libs/coldguard-commons/src
 COPY apps/incident-service/src /workspace/apps/incident-service/src
-WORKDIR /workspace/apps/incident-service
-RUN --mount=type=cache,target=/root/.m2 mvn -q -f /workspace/pom.xml -pl apps/incident-service -am package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -q -B -f /workspace/pom.xml -pl apps/incident-service -am package -DskipTests -Dspotless.check.skip=true
 
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 
-# curl is needed by the Docker Compose healthcheck: with mTLS enabled the gRPC
-# health protocol is TLS-only, so the healthcheck targets the existing Actuator HTTP endpoint
-# instead (see deploy/local/docker-compose.yml).
+# curl is needed by the Docker Compose healthcheck (Actuator over HTTP).
 # GID 1000 (the base image's pre-existing "ubuntu" group) matches the primary group of the
 # default single Linux user in the documented local development setup, so the group-readable,
 # read-only mounted certificate files under deploy/local/certs stay readable by this container

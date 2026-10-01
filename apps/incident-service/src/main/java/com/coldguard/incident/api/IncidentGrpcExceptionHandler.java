@@ -17,41 +17,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class IncidentGrpcExceptionHandler implements GrpcExceptionHandler {
 
-    static final Metadata.Key<String> EXISTING_INCIDENT_ID_KEY =
-            Metadata.Key.of("existing-incident-id", Metadata.ASCII_STRING_MARSHALLER);
+  static final Metadata.Key<String> EXISTING_INCIDENT_ID_KEY =
+      Metadata.Key.of("existing-incident-id", Metadata.ASCII_STRING_MARSHALLER);
 
-    @Override
-    public StatusException handleException(Throwable exception) {
-        if (exception instanceof IncidentAlreadyOpenException ex) {
-            Metadata trailers = new Metadata();
-            trailers.put(EXISTING_INCIDENT_ID_KEY, ex.getExistingIncidentId());
-            return Status.ALREADY_EXISTS
-                    .withDescription("An open incident already exists for this asset/sensor/anomaly type")
-                    .asException(trailers);
-        }
-        if (exception instanceof IllegalArgumentException ex) {
-            return Status.INVALID_ARGUMENT
-                    .withDescription(ex.getMessage())
-                    .asException();
-        }
-        if (exception instanceof IncidentNotFoundException ex) {
-            return Status.NOT_FOUND
-                    .withDescription(ex.getMessage())
-                    .asException();
-        }
-        if (exception instanceof IncidentAlreadyClosedException ex) {
-            return Status.FAILED_PRECONDITION
-                    .withDescription(ex.getMessage())
-                    .asException();
-        }
-        if (exception instanceof IncidentCloseForbiddenException ex) {
-            return Status.PERMISSION_DENIED
-                    .withDescription(ex.getMessage())
-                    .asException();
-        }
-        return Status.INTERNAL
-                .withDescription("Unexpected error")
-                .withCause(exception)
-                .asException();
+  @Override
+  public StatusException handleException(Throwable exception) {
+    if (exception instanceof IncidentAlreadyOpenException ex) {
+      Metadata trailers = new Metadata();
+      trailers.put(EXISTING_INCIDENT_ID_KEY, ex.getExistingIncidentId());
+      return Status.ALREADY_EXISTS
+          .withDescription("An open incident already exists for this asset/sensor/anomaly type")
+          .asException(trailers);
     }
+    if (exception instanceof IllegalArgumentException ex) {
+      return Status.INVALID_ARGUMENT.withDescription(ex.getMessage()).asException();
+    }
+    if (exception instanceof IncidentNotFoundException ex) {
+      return Status.NOT_FOUND.withDescription(ex.getMessage()).asException();
+    }
+    if (exception instanceof IncidentAlreadyClosedException ex) {
+      return Status.FAILED_PRECONDITION.withDescription(ex.getMessage()).asException();
+    }
+    if (exception instanceof IncidentCloseForbiddenException ex) {
+      return Status.PERMISSION_DENIED.withDescription(ex.getMessage()).asException();
+    }
+    return Status.INTERNAL.withDescription("Unexpected error").withCause(exception).asException();
+  }
 }

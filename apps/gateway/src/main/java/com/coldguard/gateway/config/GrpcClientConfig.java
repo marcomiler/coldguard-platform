@@ -8,8 +8,9 @@ import org.springframework.grpc.client.GrpcChannelFactory;
 @Configuration
 public class GrpcClientConfig {
 
-    @Bean
-    IncidentServiceGrpc.IncidentServiceBlockingStub incidentServiceBlockingStub(GrpcChannelFactory channels) {
-        return IncidentServiceGrpc.newBlockingStub(channels.createChannel("incident-service"));
-    }
+  @Bean
+  IncidentServiceGrpc.IncidentServiceBlockingStub incidentServiceBlockingStub(
+      GrpcChannelFactory channels) {
+    return IncidentServiceGrpc.newBlockingStub(channels.createChannel("incident-service"));
+  }
 }

@@ -61,15 +61,32 @@ Requisitos: JDK 25, Maven 4.1+, Docker y Docker Compose.
    cp deploy/local/.env.example deploy/local/.env
    ```
 
-3. Levantar el stack local (PostgreSQL, RabbitMQ, Mailpit, Prometheus, Grafana, Loki y los 5
-   servicios backend):
+3. Generar los certificados mTLS de desarrollo (solo la primera vez):
+
+   ```bash
+   deploy/scripts/generate-dev-certs.sh
+   ```
+
+4. Levantar el stack local (PostgreSQL, RabbitMQ, Mailpit y los 5 servicios backend):
 
    ```bash
    docker compose --env-file deploy/local/.env -f deploy/local/docker-compose.yml up --build
    ```
 
-   Puertos locales: Gateway `8080`, PostgreSQL `5432`, RabbitMQ `5672`/consola `15672`, Mailpit UI
-   `8025`, Prometheus `9090`, Grafana `3000`, Loki `3100`.
+   Observabilidad (Prometheus, Grafana, Loki) es opcional, con su propio perfil:
+
+   ```bash
+   docker compose --env-file deploy/local/.env -f deploy/local/docker-compose.yml --profile observability up -d
+   ```
+
+   Puertos publicados: Gateway `8080`, PostgreSQL `5432`, RabbitMQ `5672`/consola `15672`, Mailpit
+   UI `8025`, y con el perfil `observability` Prometheus `9090`, Grafana `3000`, Loki `3100`.
+   Puertos gRPC internos (nunca publicados): Asset `9091`, Telemetry `9092`, Incident `9093`.
+   Actuator del Gateway: `8090` (solo dentro de la red de Compose).
+
+   Formato: `mvn spotless:apply` formatea el código; `mvn verify` ejecuta `spotless:check`
+   (omitir temporalmente con `-Dspotless.check.skip=true`). Los tests de contexto completo
+   (`*ApplicationTests`) necesitan PostgreSQL en `localhost:5432`.
 
 No se crean recursos Azure ni se ejecuta `terraform apply` como parte de este setup local
 (`.claude/rules/infra.md`).
@@ -155,7 +172,7 @@ terminar.
 El canal gRPC interno entre Gateway e Incident Service exige mTLS en el stack local: Incident
 Service solo acepta llamadas de un cliente que presente un certificado firmado por la CA de
 desarrollo, y el Gateway confía únicamente en esa misma CA para validar el certificado del
-servidor. El puerto gRPC (9090) sigue sin exponerse al host.
+servidor. El puerto gRPC (9093) sigue sin exponerse al host.
 
 ### Prerrequisitos
 

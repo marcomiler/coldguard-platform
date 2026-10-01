@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Generates a local, development-only CA and two leaf certificates (Gateway client,
-# Incident Service server) used to enable mTLS between Gateway and Incident Service in
-# the local Docker Compose stack. Never run this against a real environment:
+# Generates a local, development-only CA and one leaf certificate per internal identity
+# (servers: asset-service, telemetry-service, incident-service; clients: gateway,
+# sensor-simulator) used for mTLS on every internal gRPC channel in the local Docker Compose
+# stack. Never run this against a real environment:
 # these certificates are self-signed, long-lived, and their private keys are written to
 # disk in plaintext under deploy/local/certs/, which is git-ignored on purpose.
 set -euo pipefail
@@ -9,8 +10,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CERTS_DIR="$REPO_ROOT/deploy/local/certs"
 CA_DIR="$CERTS_DIR/ca"
-GATEWAY_DIR="$CERTS_DIR/gateway"
-INCIDENT_SERVICE_DIR="$CERTS_DIR/incident-service"
+
+# Identities that also act as gRPC servers get hostname SANs; client-only identities get none.
+SERVER_IDENTITIES=(asset-service telemetry-service incident-service)
+CLIENT_IDENTITIES=(gateway sensor-simulator)
 
 VALIDITY_DAYS=825
 FORCE=false
@@ -35,7 +38,8 @@ if ! command -v openssl >/dev/null 2>&1; then
 fi
 
 if [[ "$FORCE" != "true" ]]; then
-  for existing in "$CA_DIR/ca.crt" "$GATEWAY_DIR/gateway.crt" "$INCIDENT_SERVICE_DIR/incident-service.crt"; do
+  for existing in "$CA_DIR/ca.crt" \
+    "$CERTS_DIR"/*/*.crt; do
     if [[ -f "$existing" ]]; then
       echo "ERROR: $existing already exists. Re-run with --force to regenerate all certificates." >&2
       echo "Regenerating invalidates every certificate previously trusted by the CA: restart" >&2
@@ -45,7 +49,7 @@ if [[ "$FORCE" != "true" ]]; then
   done
 fi
 
-mkdir -p "$CA_DIR" "$GATEWAY_DIR" "$INCIDENT_SERVICE_DIR"
+mkdir -p "$CA_DIR"
 
 echo "Generating local development CA (coldguard-local-ca, ${VALIDITY_DAYS} days)..."
 openssl req -x509 -newkey rsa:2048 -nodes \
@@ -77,25 +81,34 @@ issue_leaf_certificate() {
   rm -f "$csr"
 }
 
-echo "Issuing Incident Service server certificate (SANs: incident-service, localhost, host.docker.internal, 127.0.0.1)..."
-issue_leaf_certificate "incident-service" "$INCIDENT_SERVICE_DIR" \
-  "DNS:incident-service,DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1"
+for name in "${SERVER_IDENTITIES[@]}"; do
+  mkdir -p "$CERTS_DIR/$name"
+  echo "Issuing $name certificate (SANs: $name, localhost, host.docker.internal, 127.0.0.1)..."
+  issue_leaf_certificate "$name" "$CERTS_DIR/$name" \
+    "DNS:$name,DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1"
+done
 
-echo "Issuing Gateway client certificate (client-auth only; no server hostname is ever verified against it)..."
-issue_leaf_certificate "gateway" "$GATEWAY_DIR" ""
+for name in "${CLIENT_IDENTITIES[@]}"; do
+  mkdir -p "$CERTS_DIR/$name"
+  echo "Issuing $name client certificate (no hostname is ever verified against it)..."
+  issue_leaf_certificate "$name" "$CERTS_DIR/$name" ""
+done
 
 # The CA private key never leaves the host and is never mounted for reading by a container:
 # owner-only access.
 chmod 600 "$CA_DIR/ca.key"
-# The two service private keys are read by their respective containers through a read-only
+# The leaf private keys are read by their respective containers through a read-only
 # bind mount; group-read (not world-read) lets the container's non-root user read them
 # without exposing them to other accounts on the host. This relies on the key files already
 # belonging to the current user's primary group (the default for newly created files), which
 # matches the fixed GID assigned to the container's service user (see the Dockerfiles).
-chmod 640 "$GATEWAY_DIR/gateway.key" "$INCIDENT_SERVICE_DIR/incident-service.key"
+for name in "${SERVER_IDENTITIES[@]}" "${CLIENT_IDENTITIES[@]}"; do
+  chmod 640 "$CERTS_DIR/$name/$name.key"
+done
 
 echo ""
 echo "Done. Generated under $CERTS_DIR (git-ignored, development-only, never commit):"
 echo "  $CA_DIR/ca.crt / ca.key"
-echo "  $GATEWAY_DIR/gateway.crt / gateway.key"
-echo "  $INCIDENT_SERVICE_DIR/incident-service.crt / incident-service.key"
+for name in "${SERVER_IDENTITIES[@]}" "${CLIENT_IDENTITIES[@]}"; do
+  echo "  $CERTS_DIR/$name/$name.crt / $name.key"
+done

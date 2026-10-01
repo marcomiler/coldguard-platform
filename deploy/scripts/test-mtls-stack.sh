@@ -88,7 +88,7 @@ echo "OK: valid request succeeded over the real mTLS channel (HTTP $create_statu
 echo "Confirming a client without a certificate is rejected at the TLS handshake..."
 network_name="$(docker compose -f "$COMPOSE_FILE" ps --format '{{.Networks}}' incident-service | head -n1)"
 if printf 'x' | docker run --rm -i --network "$network_name" -v "$CERTS_DIR/ca/ca.crt:/ca.crt:ro" alpine/openssl s_client \
-    -connect incident-service:9090 -CAfile /ca.crt -verify_return_error -quiet >/tmp/mtls-stack-test-no-cert.log 2>&1; then
+    -connect incident-service:9093 -CAfile /ca.crt -verify_return_error -quiet >/tmp/mtls-stack-test-no-cert.log 2>&1; then
   echo "ERROR: connection without a client certificate was NOT rejected." >&2
   cat /tmp/mtls-stack-test-no-cert.log >&2
   exit 1

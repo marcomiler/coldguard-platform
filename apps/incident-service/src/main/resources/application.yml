@@ -1,12 +1,20 @@
 server:
   port: 8083
+  shutdown: graceful
 
 spring:
   application:
     name: incident-service
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
   grpc:
     server:
-      # Port stays 9090 (spring-grpc default); not overridden here.
+      # Explicit per-service gRPC port (9091 asset, 9092 telemetry, 9093 incident) so no service
+      # collides with Prometheus on 9090 when run on the host.
+      port: ${GRPC_SERVER_PORT:9093}
       ssl:
         enabled: true
         bundle: incident-service-server

@@ -1,9 +1,15 @@
 server:
   port: 8081
+  shutdown: graceful
 
 spring:
   application:
     name: asset-service
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:coldguard}?currentSchema=asset
     username: ${DB_USER:coldguard}
