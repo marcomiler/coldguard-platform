@@ -590,6 +590,132 @@ ADR-007 ("vía metadata gRPC... o revalidan el token según se defina en impleme
 RN-019, RN-007; ADR-007, ADR-008; DEC-013; `docs/planning/roadmap.md` (Sprint 4);
 `.claude/rules/security.md`.
 
+## DEC-015 — Ciclo de vida ampliado del incidente: CREATED → ACKNOWLEDGED → ESCALATED → CLOSED
+**Fecha:** 2026-09-30
+**Estado:** Aprobada
+### Contexto
+DEC-013 dejó solo `CREATED` y `CLOSED`; `docs/domain/state-machines.md` no formaliza la máquina del
+incidente. CU-004 (reconocer) y CU-005 (escalar) exigen estados y guards para implementarse
+(`docs/specs/SPEC-007-incident-service.md`).
+### Decisión
+- Estados: `CREATED`, `ACKNOWLEDGED`, `ESCALATED`, `CLOSED`. "Abierto" (RN-004) es cualquier estado
+  distinto de `CLOSED`.
+- `acknowledge`: una sola vez, sobre un incidente abierto; detiene el reloj de reconocimiento
+  (RN-006). Si ya estaba `ESCALATED`, conserva ese estado.
+- `escalate`: desde cualquier estado abierto, repetible, con motivo obligatorio; nunca automático
+  (CU-005).
+- `close`: desde cualquier estado abierto, con causa y comentario (RN-007) y rol Técnico de
+  mantenimiento (RN-019). Cerrar sin reconocimiento previo no está prohibido; queda fuera del
+  cálculo de MTTA.
+- Un evento de persistencia (RN-005) actualiza el incidente abierto (contador y última
+  ocurrencia); la urgencia se recalcula sin desescalar y todo recálculo de prioridad se audita
+  (RN-014).
+- El enum gRPC `IncidentStatus` gana `ACKNOWLEDGED = 3` y `ESCALATED = 4` (cambio compatible,
+  ADR-003).
+### Alternativas descartadas
+- Mantener `ACKNOWLEDGED`/`ESCALATED` solo como eventos: no permite consultar el estado actual ni
+  aplicar guards.
+### Consecuencias
+- El índice único de incidentes abiertos pasa a cubrir todo estado distinto de `CLOSED`.
+- `state-machines.md` formaliza la máquina del incidente en el cierre documental.
+### Trazabilidad
+RF-005 a RF-007; CU-004 a CU-006; RN-004 a RN-007, RN-014, RN-019; DEC-013; ADR-003.
+
+## DEC-016 — Transporte y productores de eventos de telemetría y conectividad
+**Fecha:** 2026-09-30
+**Estado:** Aprobada
+### Contexto
+`docs/architecture/data-flow.md` y `container-diagram.md` indican "gRPC, si aplica" para
+`TelemetryThresholdBreached`, mientras `event-flow.md` y ADR-009 lo tratan como evento por
+RabbitMQ. `bounded-contexts.md` asigna `SensorConnectivityLost` a Asset; `event-flow.md` y
+`container-diagram.md` a Telemetry.
+### Decisión
+- `TelemetryThresholdBreached` viaja por RabbitMQ vía Outbox desde Telemetry Service hacia Incident
+  Service (ADR-004, ADR-009). No hay llamada gRPC Telemetry → Incident.
+- `SensorConnectivityLost` lo produce Telemetry Service (es quien conoce la última lectura). Sigue
+  sin crear incidente (RN-020).
+- `TelemetryReceived` no se publica en RabbitMQ: su único consumidor es el propio Telemetry
+  Service; se materializa como lectura persistida y contador Micrometer.
+### Consecuencias
+- Se corrigen `data-flow.md`, `container-diagram.md` y `bounded-contexts.md`.
+- Incident Service crea y actualiza incidentes desde un consumidor idempotente.
+### Trazabilidad
+RF-003, RF-004, RF-005, RF-017; CU-002, CU-003, CU-022; RN-020; ADR-004, ADR-005, ADR-009.
+
+## DEC-017 — Contexto de evaluación de telemetría y entrada de CU-015
+**Fecha:** 2026-09-30
+**Estado:** Aprobada
+### Contexto
+Telemetry necesita perfil operativo, estado del sensor y criticidad del activo (datos de Asset)
+para evaluar lecturas. DEC-003 describe CU-015 como "REST interno protegido", pero la regla de
+arquitectura reserva el REST de negocio al Gateway.
+### Decisión
+- Telemetry obtiene el contexto por gRPC a Asset (`GetSensorEvaluationContext`), con caché local
+  acotada (TTL y tamaño configurables) e invalidación por eventos de Asset. Consistencia eventual,
+  sin tablas ni FK entre esquemas (ADR-006).
+- CU-015 se expone como ruta REST del Gateway restringida a Administrador de plataforma, que invoca
+  el mismo RPC de ingesta de Telemetry (origen `TEST_INJECTION`), garantizando RN-015. Precisa
+  DEC-003: sigue siendo REST protegido, no público, pero atraviesa el Gateway.
+### Consecuencias
+- Si Asset no está disponible, solo fallan lotes de sensores no cacheados.
+- `container-diagram.md` refleja Gateway → Telemetry.
+### Trazabilidad
+RF-004, RF-014; CU-002, CU-015; RN-001, RN-015; DEC-003; ADR-003, ADR-006, ADR-008.
+
+## DEC-018 — Auditoría por eventos, destinatarios y parámetros de demostración
+**Fecha:** 2026-09-30
+**Estado:** Aprobada (con valores placeholder académico, pendiente de confirmación del PO)
+### Decisión
+- **Audit Log**: recibe transiciones de otros servicios consumiendo eventos de dominio desde
+  RabbitMQ hacia el esquema `auditlog`; Incident y su módulo Identity escriben in-process en la
+  misma transacción (RN-008).
+- **Destinatarios de notificación** (no existe matriz confirmada): placeholder académico —
+  `IncidentCreated` notifica a usuarios con rol Supervisor de operaciones; `IncidentEscalated` al
+  Técnico de mantenimiento. Incident Service resuelve los correos desde Identity & Access.
+- **Valores de demostración** (bandas de magnitud, ventana de persistencia, intervalo esperado de
+  lectura, validez de calibración, periodicidad de la tarea de vencimiento, SLA de demo): se
+  configuran por perfil o propiedad; los valores de seed son placeholder académico, no requisitos
+  de negocio confirmados.
+- **Consultas de incidentes** (listado y detalle): se tratan como soporte de CU-004, CU-005, CU-006
+  y del tablero (HU-014); no crean un CU nuevo.
+- **Retención de lecturas**: sin purga en el MVP local; índices y paginación obligatorios.
+### Consecuencias
+- Ninguno de estos valores se presenta como confirmado en documentación ni pruebas.
+### Trazabilidad
+RF-008, RF-009, RF-018; CU-003, CU-005, CU-009; RN-008, RN-011, RN-018, RN-020;
+`docs/quality/sla-kpi.md`; DEC-005, DEC-008.
+
+## DEC-019 — Topología local de observabilidad
+**Fecha:** 2026-09-30
+**Estado:** Aprobada
+### Decisión
+- Trazas: OpenTelemetry Collector como punto único OTLP hacia un backend local (Grafana Tempo).
+- Métricas: scrape directo de Prometheus (`/actuator/prometheus` en puerto de management) y
+  plugin `rabbitmq_prometheus` del broker.
+- Logs: JSON a stdout, recolectados por Grafana Alloy hacia Loki.
+- Grafana con datasources y dashboards provisionados como código.
+### Alternativas descartadas
+- Jaeger como backend de trazas; Promtail (en deprecación, a verificar al implementar).
+### Consecuencias
+- Cambiar el destino a Application Insights en la fase Azure solo exige reconfigurar el collector.
+- Cierra el TODO de `docker-strategy.md` y `deployment-view.md`. No se crean recursos Azure.
+### Trazabilidad
+RNF-002, RNF-004, RNF-008; `docs/operations/observability-strategy.md`; HU-021.
+
+## DEC-020 — Modelo Organización/Sede/Activo y eventos de actualización
+**Fecha:** 2026-09-30
+**Estado:** Aprobada
+### Decisión
+- RF-001 se modela como `Organization` 1—N `Site` 1—N `Asset` (unidad de frío), con atributos
+  mínimos definidos en `docs/specs/SPEC-005-asset-service.md`.
+- Se catalogan tres eventos nuevos (siguiente fila libre, sin renumerar): `AssetUpdated` y
+  `OperationalProfileUpdated` (Asset Service; CU-013, CU-011, CU-012) y
+  `UserAccessAssignmentChanged` (Incident Service, módulo Identity & Access; CU-014, RN-008).
+### Consecuencias
+- `domain-model.md`, `commands-events.md`, `use-cases.md` se actualizan en el cierre documental.
+### Trazabilidad
+RF-001, RF-010 a RF-013; CU-001, CU-011 a CU-014; RN-008; DEC-004.
+
 ## Referencias a decisiones registradas en otros documentos
 
 Decisiones confirmadas posteriores al cierre de Sprint 1, documentadas en su lugar natural

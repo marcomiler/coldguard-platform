@@ -11,9 +11,10 @@ flowchart LR
   GW -->|gRPC| AS[Asset Service]
   GW -->|gRPC| IS["Incident Service<br/>(incluye módulos internos:<br/>Identity & Access, Audit Log,<br/>consultas operativas)"]
   Simulator[Sensor Simulator] -->|gRPC, telemetría| TS[Telemetry Service]
-  Admin[Administrador de plataforma] -->|REST interno protegido, CU-015| TestEndpoint[Endpoint interno protegido de pruebas]
-  TestEndpoint --> TS
-  TS -->|gRPC, si aplica| IS
+  Admin[Administrador de plataforma] -->|REST protegido, pasa por el Gateway, CU-015, DEC-017| TestEndpoint[Endpoint interno protegido de pruebas]
+  TestEndpoint --> GW
+  MQ -->|AMQP, consume TelemetryThresholdBreached, DEC-016| IS
+  GW -->|gRPC, CU-015, DEC-017| TS
   TS -->|SQL| DB[(PostgreSQL)]
   AS -->|SQL| DB
   IS -->|SQL, esquemas incident/identity/auditlog| DB

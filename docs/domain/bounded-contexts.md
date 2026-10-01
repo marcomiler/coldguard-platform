@@ -13,13 +13,13 @@ de negocio ni agregación propia (ADR-008). No aparece en la tabla siguiente.
 
 | Bounded context | Servicio (contenedor) | Agregados propios | Esquema PostgreSQL | Eventos que publica | Eventos que consume |
 |---|---|---|---|---|---|
-| Asset | Asset Service | `Asset` / `Sensor`, `OperationalProfile` | `asset` | `AssetRegistered`, `SensorStatusChanged`, `SensorReassigned`, `SensorCalibrationRecorded`, `SensorCalibrationExpired`, `SensorRetired`, `SensorConnectivityLost` | — (ninguno confirmado) |
-| Telemetry | Telemetry Service | `TelemetryReading` | `telemetry` | `TelemetryReceived`, `TelemetryThresholdBreached` | — |
+| Asset | Asset Service | `Asset` / `Sensor`, `OperationalProfile` | `asset` | `AssetRegistered`, `SensorStatusChanged`, `SensorReassigned`, `SensorCalibrationRecorded`, `SensorCalibrationExpired`, `SensorRetired` | — (ninguno confirmado) |
+| Telemetry | Telemetry Service | `TelemetryReading` | `telemetry` | `TelemetryThresholdBreached`, `SensorConnectivityLost` (DEC-016; `TelemetryReceived` es interno, no se publica) | — |
 | Incident | Incident Service (incluye los 3 módulos internos siguientes) | `Incident` | `incident` | `IncidentCreated`, `IncidentAcknowledged`, `IncidentEscalated`, `IncidentClosed`, `NotificationRequested`, `NotificationFailed` | `TelemetryThresholdBreached` |
 | Incident · Identity & Access (módulo interno, DEC-004/DEC-008) | Incident Service | `UserAccessAssignment` | `identity` (esquema lógico) | — (no catalogados; ver TODO de `commands-events.md`) | — |
 | Incident · Audit Log (módulo interno, DEC-005/DEC-008) | Incident Service | `AuditRecord` (incl. `SensorLifecycleAudit`) | `auditlog` (esquema lógico) | — | Registra transiciones de `Sensor`, `Incident`, `UserAccessAssignment` (RN-008); no publica eventos propios |
 | Incident · consultas operativas (módulo interno, DEC-006/DEC-008) | Incident Service | Sin agregado propio; lee del agregado `Incident` (RF-009/CU-008) | `incident` (mismo esquema, solo lectura) | — | — |
-| Notification | Notification Service | Sin agregado de dominio propio confirmado (solicitudes/estado de envío, RF-008) | — (sin esquema propio confirmado en `container-diagram.md`) | — | `IncidentCreated`, `IncidentEscalated` (vía `NotificationRequested`, RabbitMQ) |
+| Notification | Notification Service | Sin agregado de dominio propio confirmado (solicitudes/estado de envío, RF-008) | `notification` (DEC-012; estado de envío e idempotencia) | — | `IncidentCreated`, `IncidentEscalated` (vía `NotificationRequested`, RabbitMQ) |
 
 ## Reglas de límite
 

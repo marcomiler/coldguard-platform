@@ -51,3 +51,17 @@ sigue perteneciendo a APF2 (RF-015/CU-016), sin cambio de fase.
 Service**, no como microservicio separado ni bajo arquitectura hexagonal formal. No cambia el
 ownership fijado arriba ni la responsabilidad del Gateway en el borde; cambia únicamente la forma
 de despliegue del módulo.
+
+**Tercera actualización (D-02 y D-03, `docs/specs/README.md`)**: se cierran los dos puntos que este
+ADR dejaba abiertos para la implementación local.
+- **Emisión del JWT**: el Gateway firma el token (RS256) después de que Identity & Access (módulo
+  interno de Incident Service) verifique las credenciales por gRPC. Identity & Access no maneja
+  claves de firma; los servicios internos siguen sin parsear JWT ni añadir el starter de seguridad.
+  El par de claves local se genera con los scripts de desarrollo y nunca se versiona.
+- **Propagación de identidad**: el Gateway envía la identidad validada como metadata gRPC
+  (`x-actor-id`, `x-actor-roles`) sobre el canal mTLS existente; nunca como campo de request ni
+  reenviando el token. Los servicios internos solo aceptan esa metadata del cliente con identidad
+  `gateway`. Esto cierra el punto abierto de DEC-014.
+- Sin refresh tokens ni revocación previa a la expiración en el MVP: se acepta como limitación
+  (riesgo ya listado arriba). No cambia el modelo RBAC ni el ownership de usuarios y roles.
+- No se crea ningún recurso Azure.

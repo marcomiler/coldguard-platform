@@ -10,7 +10,7 @@ flowchart LR
   Sim[Sensor Simulator] -->|gRPC, telemetría, DEC-003| TS[Telemetry Service]
   TS -->|evalúa perfil operativo, RN-001/RN-002| TS
   TS -->|persiste lectura, esquema telemetry| DB[(PostgreSQL)]
-  TS -->|TelemetryThresholdBreached, si aplica| IS[Incident Service]
+  TS -->|TelemetryThresholdBreached, si aplica, vía RabbitMQ y Outbox, DEC-016| IS[Incident Service]
   IS -->|crea/actualiza, RN-003 a RN-005, RN-012| IS
   IS -->|persiste incidente, esquema incident| DB
   IS -->|IncidentCreated| MQ[RabbitMQ]
@@ -25,7 +25,7 @@ incidentes.
 
 ```mermaid
 flowchart LR
-  Admin[Administrador de plataforma] -->|REST interno protegido, CU-015, DEC-003| TestEP[Endpoint interno protegido]
+  Admin[Administrador de plataforma] -->|REST protegido vía Gateway, CU-015, DEC-003, DEC-017| TestEP[Endpoint interno protegido]
   TestEP --> TS[Telemetry Service]
   TS -->|mismo camino que el flujo A, RN-015| TS
 ```
