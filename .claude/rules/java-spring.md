@@ -20,9 +20,10 @@ rule, or a skill ever states a different version as current, that's stale — ch
   `.claude/rules/architecture.md`); infrastructure concerns stay in adapters at the module's edge.
 - REST only at the Gateway edge; gRPC for internal synchronous calls (ADR-003); no service calls
   another service's REST endpoint directly (ADR-008). The gRPC contracts themselves live in
-  `contracts/grpc/` — currently empty (`.gitkeep` only); no `.proto` files or gRPC client library
-  choice have been made yet, so don't assume a specific gRPC integration (Spring gRPC project vs.
-  a community starter vs. raw `grpc-java`) is already selected.
+  `contracts/grpc/` — today only `incident_service.proto` (v1) exists; the full contract layout is
+  specified in `docs/specs/SPEC-002-contratos.md`. The gRPC library is **Spring gRPC**
+  (`org.springframework.grpc`, DEC-012), already used by `gateway` (client) and `incident-service`
+  (server); don't introduce a community starter or raw `grpc-java` wiring.
 - Event consumers must be idempotent against at-least-once delivery (RabbitMQ + Transactional
   Outbox, ADR-009); do not assume exactly-once delivery in code.
 - Never hardcode secrets, credentials, or connection strings; read them from environment variables
@@ -66,10 +67,11 @@ rule, or a skill ever states a different version as current, that's stale — ch
 
 ## Spring Boot 4.1.1 conventions
 
-These reflect what Spring Boot 4.1.1 actually makes available. **None of them are adopted in code
-yet** — verified against all five `apps/*/pom.xml`: no dependency on a gRPC library, JSpecify, or
-an OpenTelemetry starter exists in any module today, and `apps/gateway/src` has only empty
-`package-info.java` placeholders. Treat the items below as "available to use," not "already used."
+These reflect what Spring Boot 4.1.1 actually makes available. Verified against the `pom.xml`
+files: Spring gRPC and Flyway are already adopted (`gateway`, `incident-service`; DEC-012);
+JSpecify and an OpenTelemetry starter are **not** adopted in any module yet, and `asset-service`,
+`telemetry-service` and `notification-service` still contain only package placeholders. Treat the
+items below as "available to use" unless the sentence says otherwise.
 
 - **Declarative HTTP clients**: register `@HttpExchange` interfaces in groups via
   `@ImportHttpServices` on a configuration class (the "consumer-driven" model — you annotate your
@@ -81,9 +83,9 @@ an OpenTelemetry starter exists in any module today, and `apps/gateway/src` has 
   Spring reference docs before writing code against `@HttpServiceClient`.
 - **gRPC**: the Spring gRPC project's auto-configuration, extended in Spring Boot 4.1 with
   `@GrpcAdvice` + `@GrpcExceptionHandler` for centralized exception-to-status mapping, is one
-  candidate for this project's gRPC integration. **Not yet selected** — no gRPC library choice has
-  been made (see "Project boundaries" above); don't assume Spring gRPC over a community starter or
-  raw `grpc-java` without that decision being made explicit.
+  the selected gRPC integration (DEC-012, Spring gRPC 1.0.3 BOM). `@GrpcAdvice` /
+  `@GrpcExceptionHandler` availability in the pinned version is **pending verification** — today
+  `incident-service` registers a `GrpcExceptionHandler` bean.
 - **Null-safety**: JSpecify annotations (`org.jspecify.annotations.Nullable`/`NonNull`) are the
   null-safety standard as of Spring Framework 7, superseding Spring's own
   `org.springframework.lang.Nullable`/`@NonNull`. Prefer JSpecify in new domain/application code

@@ -151,8 +151,9 @@ No forman parte del recorrido lineal de 7 pasos de arriba, pero son necesarias p
 
 ## TODO
 
-- Modelo de datos / entidades de dominio (atributos concretos, relaciones, claves) pendiente de
-  definir; la tabla de conceptos de arriba es el punto de partida.
+- Modelo de datos / entidades de dominio: RF-001 se modela como `Organization` 1—N `Site` 1—N
+  `Asset` (DEC-020); atributos concretos y claves en `docs/specs/SPEC-005-asset-service.md`. El
+  resto de agregados se detalla en los specs de su servicio.
 - Criterio de vencimiento de calibración/verificación (periodicidad, unidad de tiempo): pendiente
   de definir; debe ser configurable (RN-018).
 - Frecuencia esperada configurable que determina la pérdida de conectividad (RN-020): pendiente
