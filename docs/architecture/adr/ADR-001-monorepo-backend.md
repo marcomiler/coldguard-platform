@@ -27,6 +27,7 @@ Se usa un repositorio backend central (`coldguard-platform`) que aloja: servicio
 - ADR-002 (frontend en repositorio separado).
 - ADR-003 (gRPC interno, contratos versionados dentro de este monorepo).
 - ADR-006 (persistencia con ownership lógico por servicio dentro del monorepo).
+- ADR-010 (módulo técnico compartido `libs/coldguard-commons`, sin lógica de dominio).
 
 ## Evolución futura a Azure
 **Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado de
