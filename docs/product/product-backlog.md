@@ -380,7 +380,7 @@ tener una base de estado sobre la cual ejecutar el cierre técnico real (RN-007,
     estado; su eventual representación como estado, si llegara a decidirse, queda fuera de este
     alcance.
   - El valor `INCIDENT_STATUS_UNSPECIFIED = 0` del enum `IncidentStatus` en
-    `contracts/grpc/incident_service.proto` es el valor centinela técnico por defecto de proto3
+    `contracts/grpc/incident/v1/incident_service.proto` es el valor centinela técnico por defecto de proto3
     (todo enum de protobuf requiere un primer valor por defecto/no seteado); no representa un
     tercer estado de negocio del incidente.
 - Prioridad: Must have.
@@ -399,7 +399,7 @@ el MTTR y dejar registrado el diagnóstico, causa y comentario de resolución (R
     CLOSED; cerrar un incidente inexistente o ya CLOSED es rechazado explícitamente
     (`CloseIncidentService`, `IncidentAlreadyClosedException`, `IncidentNotFoundException`).
   - **RPC gRPC / endpoint REST — pendiente**: no existe ningún RPC `CloseIncident` en
-    `contracts/grpc/incident_service.proto` ni endpoint en el Gateway (DEC-014).
+    `contracts/grpc/incident/v1/incident_service.proto` ni endpoint en el Gateway (DEC-014).
   - **JWT/RBAC — pendiente**: no se valida que el actor sea el Técnico de mantenimiento; requiere
     JWT/RBAC real (Sprint 4, sin implementar).
   - **Causa/comentario de resolución (RN-007) — pendiente**: no se exige ni persiste en la capa

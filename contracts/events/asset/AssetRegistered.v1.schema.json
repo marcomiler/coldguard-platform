@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/asset/AssetRegistered.v1.schema.json",
+  "title": "AssetRegistered v1",
+  "description": "A cold unit (asset) was registered.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "AssetRegistered"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "asset-service"
+    },
+    "aggregateType": {
+      "const": "Asset"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "siteId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criticality": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
+          ]
+        }
+      },
+      "required": [
+        "assetId",
+        "siteId",
+        "name",
+        "criticality"
+      ]
+    }
+  }
+}

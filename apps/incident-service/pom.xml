@@ -74,6 +74,17 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
+        <configuration>
+          <!-- Only the contracts this service implements (plus shared types); all other
+               contracts are imported, not compiled. -->
+          <includes>
+            <include>common/**/*.proto</include>
+            <include>incident/**/*.proto</include>
+            <include>identity/**/*.proto</include>
+            <include>audit/**/*.proto</include>
+            <include>metrics/**/*.proto</include>
+          </includes>
+        </configuration>
       </plugin>
     </plugins>
   </build>

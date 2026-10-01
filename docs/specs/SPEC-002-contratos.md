@@ -95,7 +95,7 @@ Servidor: asset-service. Clientes: Gateway, Telemetry Service.
 | `UpsertOperationalProfile(sensor_id, …)` | CU-011 / RF-010 | emite `OperationalProfileUpdated` (D-14) |
 | `GetOperationalProfile(sensor_id)` | CU-013 / RF-012 | |
 | `ChangeSensorStatus(sensor_id, target_status, reason)` | CU-017 / RF-016 | |
-| `RecordCalibration(sensor_id, kind, performed_at, valid_until, reason)` | CU-019 / RF-016 | `kind`: CALIBRATION / VERIFICATION |
+| `RecordCalibration(sensor_id, kind, performed_at, reason)` | CU-019 / RF-016 | `kind`: CALIBRATION / VERIFICATION; `valid_until` no lo envía el cliente, se deriva del perfil (SPEC-005) |
 | `ReassignSensor(sensor_id, target_asset_id, reason)` | CU-018 / RF-016 | |
 | `RetireSensor(sensor_id, reason)` | CU-020 / RF-016 | |
 | `GetSensorHistory(sensor_id, CursorPageRequest)` | CU-021 / RF-012 | |
@@ -105,7 +105,7 @@ Servidor: asset-service. Clientes: Gateway, Telemetry Service.
 Mensajes clave:
 
 ```proto
-enum SensorStatus { SENSOR_STATUS_UNSPECIFIED = 0; ACTIVE = 1; IN_MAINTENANCE = 2; INACTIVE = 3; RETIRED = 4; }
+enum SensorStatus { SENSOR_STATUS_UNSPECIFIED = 0; SENSOR_STATUS_ACTIVE = 1; SENSOR_STATUS_IN_MAINTENANCE = 2; SENSOR_STATUS_INACTIVE = 3; SENSOR_STATUS_RETIRED = 4; }
 
 message OperationalProfile {
   string sensor_id = 1;

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/incident/IncidentClosed.v1.schema.json",
+  "title": "IncidentClosed v1",
+  "description": "The Maintenance Technician technically closed the incident.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "IncidentClosed"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "incident-service"
+    },
+    "aggregateType": {
+      "const": "Incident"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "incidentId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "closedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "cause": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "resolutionComment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "incidentId",
+        "closedAt",
+        "cause",
+        "resolutionComment"
+      ]
+    }
+  }
+}

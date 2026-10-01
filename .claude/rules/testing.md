@@ -11,8 +11,8 @@
   (timeout, connection reset, 5xx) from permanent failure (validation error, 4xx, poison message),
   tests should cover both paths.
 - gRPC contracts (`contracts/grpc/`) require contract tests, not only unit tests of the
-  implementation (RNF-006, ADR-003) — `contracts/grpc/` currently holds `incident_service.proto` (v1), so
-  this rule already applies to it; the remaining contracts follow `docs/specs/SPEC-002-contratos.md`.
+  implementation (RNF-006, ADR-003) — `contracts/grpc/` holds the versioned contracts per bounded context, and
+  `contracts/events/` the event JSON Schemas; contract tests cover both.
 - Priority calculation (impacto × urgencia → P1–P4, RN-012) needs a dedicated test matrix covering
   all **4×4 = 16 combinations** (impacto: bajo/medio/alto/crítico, RN-010; urgencia:
   baja/media/alta/inmediata, RN-011) — no sampling, no shortcuts.

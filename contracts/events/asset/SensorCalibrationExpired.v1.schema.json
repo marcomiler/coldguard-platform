@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/asset/SensorCalibrationExpired.v1.schema.json",
+  "title": "SensorCalibrationExpired v1",
+  "description": "The scheduled job detected an expired calibration or verification.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "SensorCalibrationExpired"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "asset-service"
+    },
+    "aggregateType": {
+      "const": "Sensor"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "calibrationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "expiredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "detectedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "sensorId",
+        "calibrationId",
+        "expiredAt",
+        "detectedAt"
+      ]
+    }
+  }
+}

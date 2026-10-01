@@ -10,7 +10,7 @@ fuente de verdad del catálogo. Decisiones que respaldan este flujo: ADR-004 (Ra
 | Categoría | Eventos | Productor |
 |---|---|---|
 | Telemetría | `TelemetryReceived`, `TelemetryThresholdBreached` | Telemetry Service |
-| Conectividad | `SensorConnectivityLost` | Sistema (detección por ausencia de telemetría esperada, CU-022) |
+| Conectividad | `SensorConnectivityLost` | Telemetry Service, como proceso de sistema (detección por ausencia de telemetría esperada, CU-022; DEC-016) |
 | Incidentes | `IncidentCreated`, `IncidentAcknowledged`, `IncidentEscalated`, `IncidentClosed` | Incident Service |
 | Notificación | `NotificationRequested`, `NotificationFailed` | Incident Service (solicitud) / Notification Service (resultado) |
 | Ciclo de vida del sensor | `SensorStatusChanged`, `SensorReassigned`, `SensorCalibrationRecorded`, `SensorCalibrationExpired`, `SensorRetired` | Asset Service (o Sistema, para `SensorCalibrationExpired`) |
@@ -44,9 +44,9 @@ sequenceDiagram
   TS-->>MQ: TelemetryThresholdBreached (si aplica)
   MQ-->>IS: TelemetryThresholdBreached
   IS->>IS: crea/actualiza incidente (RN-003 a RN-005)
-  IS-->>MQ: IncidentCreated
-  MQ-->>NS: IncidentCreated
-  NS->>NS: NotificationRequested / NotificationFailed
+  IS-->>MQ: IncidentCreated + NotificationRequested
+  MQ-->>NS: NotificationRequested
+  NS-->>MQ: NotificationFailed (si el envío falla)
 ```
 
 `Incident Service` **no** llama directamente a `Notification Service`: publica en `RabbitMQ`, y
@@ -78,8 +78,8 @@ sequenceDiagram
   IS-->>MQ: IncidentAcknowledged
   Sup->>IS: solicita/confirma escalamiento (CU-005)
   Note over IS: No hay escalamiento automático<br/>por vencimiento de SLA en el MVP
-  IS-->>MQ: IncidentEscalated
-  MQ-->>NS: IncidentEscalated
+  IS-->>MQ: IncidentEscalated + NotificationRequested
+  MQ-->>NS: NotificationRequested
   NS->>Tec: notificación
   Tec->>IS: diagnostica, interviene y cierra (CU-006, RN-019)
   IS-->>MQ: IncidentClosed
@@ -116,5 +116,6 @@ consulta los registros de auditoría que cada servicio ya genera (RN-008) — ve
 
 ## TODO
 
-Formato de mensaje, versionado de contrato y estrategia de reintentos/dead-letter en RabbitMQ:
-diseño técnico posterior, no definido aquí.
+Formato de mensaje, versionado y topología (exchanges, colas, dead-letter): definidos en
+`contracts/events/README.md`. Pendiente solo la estrategia de reintentos del consumidor
+(`docs/specs/SPEC-003-mensajeria-confiable.md`).

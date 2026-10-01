@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/telemetry/TelemetryThresholdBreached.v1.schema.json",
+  "title": "TelemetryThresholdBreached v1",
+  "description": "An eligible reading is outside the operational profile range.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "TelemetryThresholdBreached"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "telemetry-service"
+    },
+    "aggregateType": {
+      "const": "Sensor"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "readingId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assetCriticality": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
+          ]
+        },
+        "anomalyType": {
+          "type": "string",
+          "enum": [
+            "TEMPERATURE_ABOVE_MAX",
+            "TEMPERATURE_BELOW_MIN"
+          ]
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thresholdMin": {
+          "type": "number"
+        },
+        "thresholdMax": {
+          "type": "number"
+        },
+        "deviation": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "magnitude": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
+          ]
+        },
+        "persistent": {
+          "type": "boolean"
+        },
+        "recordedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "readingId",
+        "sensorId",
+        "assetId",
+        "assetCriticality",
+        "anomalyType",
+        "value",
+        "unit",
+        "thresholdMin",
+        "thresholdMax",
+        "deviation",
+        "magnitude",
+        "persistent",
+        "recordedAt"
+      ]
+    }
+  }
+}

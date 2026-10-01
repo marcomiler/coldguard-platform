@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/asset/SensorRetired.v1.schema.json",
+  "title": "SensorRetired v1",
+  "description": "A sensor was logically retired (terminal state).",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "SensorRetired"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "asset-service"
+    },
+    "aggregateType": {
+      "const": "Sensor"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "previousStatus": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "IN_MAINTENANCE",
+            "INACTIVE",
+            "RETIRED"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "sensorId",
+        "assetId",
+        "previousStatus",
+        "reason"
+      ]
+    }
+  }
+}

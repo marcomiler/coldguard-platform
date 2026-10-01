@@ -20,8 +20,8 @@ rule, or a skill ever states a different version as current, that's stale — ch
   `.claude/rules/architecture.md`); infrastructure concerns stay in adapters at the module's edge.
 - REST only at the Gateway edge; gRPC for internal synchronous calls (ADR-003); no service calls
   another service's REST endpoint directly (ADR-008). The gRPC contracts themselves live in
-  `contracts/grpc/` — today only `incident_service.proto` (v1) exists; the full contract layout is
-  specified in `docs/specs/SPEC-002-contratos.md`. The gRPC library is **Spring gRPC**
+  `contracts/grpc/` — the contracts are organised per bounded context (`<context>/v1/`, see
+  `contracts/grpc/README.md`). The gRPC library is **Spring gRPC**
   (`org.springframework.grpc`, DEC-012), already used by `gateway` (client) and `incident-service`
   (server); don't introduce a community starter or raw `grpc-java` wiring.
 - Event consumers must be idempotent against at-least-once delivery (RabbitMQ + Transactional
