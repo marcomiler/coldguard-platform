@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package com.coldguard.audit.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+option java_package = "com.coldguard.audit.grpc.v1";
+option java_multiple_files = true;
+
+// Served by incident-service (internal Audit Log module). Read-only by contract: there is no RPC
+// to create, change or delete a record.
+service AuditLogService {
+  rpc ListAuditRecords(ListAuditRecordsRequest) returns (ListAuditRecordsResponse);
+}
+
+// All filters are optional except the date range, which is required and size-limited by the
+// server.
+message ListAuditRecordsRequest {
+  string entity_type = 1;
+  string entity_id = 2;
+  string actor_id = 3;
+  string action = 4;
+  google.protobuf.Timestamp from = 5;
+  google.protobuf.Timestamp to = 6;
+  com.coldguard.common.v1.CursorPageRequest page = 7;
+}
+
+message AuditRecordView {
+  string id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string source_service = 3;
+  string entity_type = 4;
+  string entity_id = 5;
+  string action = 6;
+  string actor_type = 7; // USER | SYSTEM
+  string actor_id = 8;
+  string reason = 9;
+  google.protobuf.Struct previous_value = 10;
+  google.protobuf.Struct new_value = 11;
+  string correlation_id = 12;
+}
+
+message ListAuditRecordsResponse {
+  repeated AuditRecordView records = 1;
+  com.coldguard.common.v1.CursorPageInfo page = 2;
+}

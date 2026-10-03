@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package com.coldguard.identity.v1;
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+option java_package = "com.coldguard.identity.grpc.v1";
+option java_multiple_files = true;
+
+// Served by incident-service (internal Identity & Access module). Clients: Gateway.
+// Passwords are only ever received (VerifyCredentials, CreateUser) and are never returned, logged
+// or stored in clear. Never log messages of this service in full.
+service IdentityService {
+  // Returns UNAUTHENTICATED with the same generic description for an unknown user, a wrong
+  // password, a disabled user and a locked user.
+  rpc VerifyCredentials(VerifyCredentialsRequest) returns (AuthenticatedUser);
+  rpc CreateUser(CreateUserRequest) returns (User);
+  rpc GetUser(GetUserRequest) returns (User);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc AssignRole(AssignRoleRequest) returns (User);
+  rpc RevokeRole(RevokeRoleRequest) returns (User);
+  rpc SetUserEnabled(SetUserEnabledRequest) returns (User);
+  // Internal, used by incident-service to resolve notification recipients. Not exposed.
+  rpc ListUserContacts(ListUserContactsRequest) returns (ListUserContactsResponse);
+}
+
+// Exactly the five human actors of the platform. The names are the stable role vocabulary used
+// in the JWT `roles` claim, so they are intentionally not prefixed.
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  OPERATIONS_SUPERVISOR = 1;
+  OPERATOR = 2;
+  MAINTENANCE_TECHNICIAN = 3;
+  AUDITOR = 4;
+  PLATFORM_ADMIN = 5;
+}
+
+message VerifyCredentialsRequest {
+  string username = 1;
+  string password = 2; // sensitive
+}
+
+message AuthenticatedUser {
+  string user_id = 1;
+  string username = 2;
+  string display_name = 3;
+  repeated Role roles = 4;
+}
+
+message User {
+  string user_id = 1;
+  string username = 2;
+  string email = 3;
+  string display_name = 4;
+  repeated Role roles = 5;
+  bool enabled = 6;
+  google.protobuf.Timestamp created_at = 7;
+  int64 version = 8;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+  string display_name = 3;
+  string initial_password = 4; // sensitive
+  repeated Role roles = 5;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message ListUsersRequest {
+  com.coldguard.common.v1.PageRequest page = 1;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  com.coldguard.common.v1.PageInfo page = 2;
+}
+
+message AssignRoleRequest {
+  string user_id = 1;
+  Role role = 2;
+  string reason = 3; // required
+}
+
+message RevokeRoleRequest {
+  string user_id = 1;
+  Role role = 2;
+  string reason = 3; // required
+}
+
+message SetUserEnabledRequest {
+  string user_id = 1;
+  bool enabled = 2;
+  string reason = 3; // required
+}
+
+message ListUserContactsRequest {
+  Role role = 1;
+}
+
+message UserContact {
+  string user_id = 1;
+  string email = 2;
+}
+
+message ListUserContactsResponse {
+  repeated UserContact contacts = 1; // enabled users only
+}

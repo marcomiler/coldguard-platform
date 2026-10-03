@@ -26,7 +26,7 @@ a ADR-009), `docs/planning/decisions-log.md` (DEC-001 a DEC-014), `docs/quality/
 | Telemetry Service | Solo `package-info.java` | Todo (RF-003, RF-004, RF-014, RF-017) |
 | Notification Service | Solo `package-info.java`; sin esquema | Todo (RF-008) |
 | Sensor Simulator | No existe (`simulator/` no está en el repo) | Todo (actor de CU-002) |
-| Contratos | `contracts/grpc/incident_service.proto` (v1) | Contratos de Asset, Telemetry, Identity, Audit, métricas; catálogo físico de eventos |
+| Contratos | `contracts/grpc/incident/v1/incident_service.proto` y contratos por contexto (SPEC-002 implementado) | — |
 | Docker | Compose con 5 servicios + infraestructura | Dockerfiles de asset/telemetry/notification **no construyen** (imagen `eclipse-temurin:25-jdk` sin Maven; copian un solo `pom.xml` de módulo y el reactor raíz exige los 5); sin healthchecks salvo incident; conflicto de puerto 9090 (Prometheus vs. gRPC de Incident al correr en host) |
 | Observabilidad | Prometheus con self-scrape; Grafana y Loki sin provisionar | Sin Micrometer/Prometheus, sin OpenTelemetry, sin logs JSON, sin envío a Loki, sin dashboards |
 | Reglas `.claude/` | `java-spring.md` y `security.md` dicen que no hay `.proto` ni librería gRPC ni configuración de seguridad | Desactualizadas frente a DEC-012 y al código actual (actualizar en SPEC-011) |

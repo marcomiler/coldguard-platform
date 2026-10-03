@@ -1,0 +1,328 @@
+syntax = "proto3";
+
+package com.coldguard.asset.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+option java_package = "com.coldguard.asset.grpc.v1";
+option java_multiple_files = true;
+
+// Servers: asset-service. Clients: Gateway (all RPCs except the evaluation-context ones) and
+// telemetry-service (GetSensorEvaluationContext[s] only).
+//
+// The actor of every call travels as gRPC metadata (x-actor-id, x-actor-roles), never as a field.
+// Business errors carry a stable code in the `x-error-code` trailer (see contracts/grpc/README.md).
+service AssetService {
+  rpc CreateOrganization(CreateOrganizationRequest) returns (Organization);
+  rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse);
+  rpc CreateSite(CreateSiteRequest) returns (Site);
+  rpc ListSites(ListSitesRequest) returns (ListSitesResponse);
+
+  rpc RegisterAsset(RegisterAssetRequest) returns (Asset);
+  rpc UpdateAsset(UpdateAssetRequest) returns (Asset);
+  rpc GetAsset(GetAssetRequest) returns (Asset);
+  rpc ListAssets(ListAssetsRequest) returns (ListAssetsResponse);
+
+  rpc RegisterSensor(RegisterSensorRequest) returns (Sensor);
+  rpc UpdateSensor(UpdateSensorRequest) returns (Sensor);
+  rpc GetSensor(GetSensorRequest) returns (Sensor);
+  rpc ListSensors(ListSensorsRequest) returns (ListSensorsResponse);
+
+  rpc UpsertOperationalProfile(UpsertOperationalProfileRequest) returns (OperationalProfile);
+  rpc GetOperationalProfile(GetOperationalProfileRequest) returns (OperationalProfile);
+
+  rpc ChangeSensorStatus(ChangeSensorStatusRequest) returns (Sensor);
+  rpc RecordCalibration(RecordCalibrationRequest) returns (CalibrationRecord);
+  rpc ReassignSensor(ReassignSensorRequest) returns (Sensor);
+  rpc RetireSensor(RetireSensorRequest) returns (Sensor);
+  rpc GetSensorHistory(GetSensorHistoryRequest) returns (GetSensorHistoryResponse);
+
+  // Internal, used by telemetry-service to evaluate readings. Not exposed through the Gateway.
+  rpc GetSensorEvaluationContext(GetSensorEvaluationContextRequest) returns (SensorEvaluationContext);
+  // Batch variant: one call per ingest batch. Unknown sensor ids are omitted from the response.
+  rpc GetSensorEvaluationContexts(GetSensorEvaluationContextsRequest) returns (GetSensorEvaluationContextsResponse);
+}
+
+enum SensorStatus {
+  SENSOR_STATUS_UNSPECIFIED = 0;
+  SENSOR_STATUS_ACTIVE = 1;
+  SENSOR_STATUS_IN_MAINTENANCE = 2;
+  SENSOR_STATUS_INACTIVE = 3;
+  SENSOR_STATUS_RETIRED = 4;
+}
+
+enum CalibrationKind {
+  CALIBRATION_KIND_UNSPECIFIED = 0;
+  CALIBRATION_KIND_CALIBRATION = 1;
+  CALIBRATION_KIND_VERIFICATION = 2;
+}
+
+// ---- Organization / Site / Asset ------------------------------------------------------------
+
+message Organization {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message CreateOrganizationRequest {
+  string name = 1;
+}
+
+message ListOrganizationsRequest {
+  com.coldguard.common.v1.PageRequest page = 1;
+}
+
+message ListOrganizationsResponse {
+  repeated Organization organizations = 1;
+  com.coldguard.common.v1.PageInfo page = 2;
+}
+
+message Site {
+  string id = 1;
+  string organization_id = 2;
+  string name = 3;
+  string address = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateSiteRequest {
+  string organization_id = 1;
+  string name = 2;
+  string address = 3;
+}
+
+message ListSitesRequest {
+  string organization_id = 1;
+  com.coldguard.common.v1.PageRequest page = 2;
+}
+
+message ListSitesResponse {
+  repeated Site sites = 1;
+  com.coldguard.common.v1.PageInfo page = 2;
+}
+
+message Asset {
+  string id = 1;
+  string site_id = 2;
+  string name = 3;
+  string description = 4;
+  com.coldguard.common.v1.Criticality criticality = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  int64 version = 8;
+}
+
+message RegisterAssetRequest {
+  string site_id = 1;
+  string name = 2;
+  string description = 3;
+  com.coldguard.common.v1.Criticality criticality = 4; // required
+}
+
+// Partial update: only fields that are set are changed. `expected_version` guards against
+// concurrent modification (mismatch -> ABORTED).
+message UpdateAssetRequest {
+  string asset_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional com.coldguard.common.v1.Criticality criticality = 4;
+  int64 expected_version = 5;
+}
+
+message GetAssetRequest {
+  string asset_id = 1;
+}
+
+message ListAssetsRequest {
+  optional string site_id = 1;
+  com.coldguard.common.v1.PageRequest page = 2;
+}
+
+message ListAssetsResponse {
+  repeated Asset assets = 1;
+  com.coldguard.common.v1.PageInfo page = 2;
+}
+
+// ---- Operational profile --------------------------------------------------------------------
+
+// Deviation, in the profile's unit, above which the anomaly magnitude reaches each level.
+message MagnitudeBands {
+  double medium_from = 1;
+  double high_from = 2;
+  double critical_from = 3;
+}
+
+// Persistence: `min_consecutive_breaches` out-of-range readings of the same anomaly type within
+// `window` make the condition persistent.
+message PersistenceWindow {
+  int32 min_consecutive_breaches = 1;
+  google.protobuf.Duration window = 2;
+}
+
+// On Upsert, `version` is the expected current version (0 when creating); `updated_at` and
+// `version` in the response are authoritative.
+message OperationalProfile {
+  string sensor_id = 1;
+  double min_temperature = 2;
+  double max_temperature = 3;
+  string unit = 4; // e.g. "CELSIUS"; must match the sensor's measurement unit
+  MagnitudeBands magnitude_bands = 5;
+  PersistenceWindow persistence = 6;
+  google.protobuf.Duration expected_reading_interval = 7;
+  google.protobuf.Duration calibration_validity = 8; // unset: service default applies
+  int64 version = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message UpsertOperationalProfileRequest {
+  OperationalProfile profile = 1;
+}
+
+message GetOperationalProfileRequest {
+  string sensor_id = 1;
+}
+
+// ---- Sensor ---------------------------------------------------------------------------------
+
+message Sensor {
+  string id = 1;
+  string serial_number = 2;
+  string model = 3;
+  string measurement_unit = 4;
+  string asset_id = 5;
+  SensorStatus status = 6;
+  google.protobuf.Timestamp status_changed_at = 7;
+  google.protobuf.Timestamp last_calibration_recorded_at = 8;
+  google.protobuf.Timestamp last_calibration_valid_until = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  int64 version = 12;
+}
+
+message InitialCalibration {
+  CalibrationKind kind = 1;
+  google.protobuf.Timestamp performed_at = 2;
+  string reason = 3;
+}
+
+// The initial calibration and the profile are optional: a sensor may be registered first and
+// completed later.
+message RegisterSensorRequest {
+  string asset_id = 1;
+  string serial_number = 2;
+  string model = 3;
+  string measurement_unit = 4;
+  optional InitialCalibration initial_calibration = 5;
+  optional OperationalProfile profile = 6;
+}
+
+// Technical data only; status and asset change through their dedicated RPCs.
+message UpdateSensorRequest {
+  string sensor_id = 1;
+  optional string serial_number = 2;
+  optional string model = 3;
+  int64 expected_version = 4;
+}
+
+message GetSensorRequest {
+  string sensor_id = 1;
+}
+
+message ListSensorsRequest {
+  optional string asset_id = 1;
+  optional SensorStatus status = 2;
+  com.coldguard.common.v1.PageRequest page = 3;
+}
+
+message ListSensorsResponse {
+  repeated Sensor sensors = 1;
+  com.coldguard.common.v1.PageInfo page = 2;
+}
+
+// ---- Lifecycle ------------------------------------------------------------------------------
+
+message ChangeSensorStatusRequest {
+  string sensor_id = 1;
+  SensorStatus target_status = 2;
+  string reason = 3; // required
+}
+
+// `valid_until` is never supplied by the caller: it is derived from `performed_at` and the
+// profile's calibration validity.
+message RecordCalibrationRequest {
+  string sensor_id = 1;
+  CalibrationKind kind = 2;
+  google.protobuf.Timestamp performed_at = 3;
+  string reason = 4; // required
+}
+
+message CalibrationRecord {
+  string id = 1;
+  string sensor_id = 2;
+  CalibrationKind kind = 3;
+  google.protobuf.Timestamp performed_at = 4;
+  google.protobuf.Timestamp valid_until = 5;
+  google.protobuf.Timestamp recorded_at = 6;
+  string recorded_by = 7;
+  string reason = 8;
+}
+
+message ReassignSensorRequest {
+  string sensor_id = 1;
+  string target_asset_id = 2;
+  string reason = 3; // required
+}
+
+message RetireSensorRequest {
+  string sensor_id = 1;
+  string reason = 2; // required
+}
+
+message GetSensorHistoryRequest {
+  string sensor_id = 1;
+  com.coldguard.common.v1.CursorPageRequest page = 2;
+}
+
+// One administrative history entry (state change, calibration, reassignment, retirement...).
+// Automatic transitions carry actor_type = "SYSTEM".
+message SensorHistoryEntry {
+  string id = 1;
+  string action = 2;
+  google.protobuf.Struct previous_value = 3;
+  google.protobuf.Struct new_value = 4;
+  string reason = 5;
+  string actor_type = 6; // USER | SYSTEM
+  string actor_id = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+}
+
+message GetSensorHistoryResponse {
+  repeated SensorHistoryEntry entries = 1;
+  com.coldguard.common.v1.CursorPageInfo page = 2;
+}
+
+// ---- Evaluation context (internal) ----------------------------------------------------------
+
+message SensorEvaluationContext {
+  string sensor_id = 1;
+  string asset_id = 2;
+  com.coldguard.common.v1.Criticality asset_criticality = 3;
+  SensorStatus status = 4;
+  OperationalProfile profile = 5; // unset: readings of this sensor are not evaluable
+}
+
+message GetSensorEvaluationContextRequest {
+  string sensor_id = 1;
+}
+
+message GetSensorEvaluationContextsRequest {
+  repeated string sensor_ids = 1;
+}
+
+message GetSensorEvaluationContextsResponse {
+  repeated SensorEvaluationContext contexts = 1;
+}

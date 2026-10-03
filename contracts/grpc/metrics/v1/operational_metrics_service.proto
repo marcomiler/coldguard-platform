@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package com.coldguard.metrics.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_package = "com.coldguard.metrics.grpc.v1";
+option java_multiple_files = true;
+
+// Served by incident-service (internal operational-queries module). Business metrics only; it
+// reports measured values, never a verdict against aggregate targets that are not confirmed.
+service OperationalMetricsService {
+  rpc GetIncidentMetrics(GetIncidentMetricsRequest) returns (GetIncidentMetricsResponse);
+}
+
+// `from`/`to` are required and range-limited by the server; they bound incident creation time.
+message GetIncidentMetricsRequest {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp to = 2;
+}
+
+message PriorityMetrics {
+  string priority = 1; // P1..P4
+  int64 total = 2;
+  int64 acknowledged = 3;
+  int64 acknowledged_on_time = 4;
+  int64 closed = 5;
+  int64 closed_on_time = 6; // only incidents with a resolution target are counted as evaluable
+  optional double ack_compliance_ratio = 7;     // unset when nothing is evaluable
+  optional double resolve_compliance_ratio = 8; // unset when nothing is evaluable
+}
+
+message GetIncidentMetricsResponse {
+  map<string, int64> count_by_status = 1;   // CREATED, ACKNOWLEDGED, ESCALATED, CLOSED
+  map<string, int64> count_by_priority = 2; // P1..P4
+  optional double mtta_seconds = 3;         // unset when no incident was acknowledged
+  optional double mttr_seconds = 4;         // unset when no incident was closed
+  repeated PriorityMetrics by_priority = 5;
+}

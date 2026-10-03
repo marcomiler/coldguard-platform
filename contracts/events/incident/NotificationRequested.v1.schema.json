@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/incident/NotificationRequested.v1.schema.json",
+  "title": "NotificationRequested v1",
+  "description": "Incident Service asks Notification Service to notify recipients (ADR-005).",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "NotificationRequested"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "incident-service"
+    },
+    "aggregateType": {
+      "const": "Incident"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "notificationRequestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "incidentId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "notificationType": {
+          "type": "string",
+          "enum": [
+            "INCIDENT_CREATED",
+            "INCIDENT_ESCALATED"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "P1",
+            "P2",
+            "P3",
+            "P4"
+          ]
+        },
+        "assetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "recipients": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "userId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              }
+            },
+            "required": [
+              "userId",
+              "email"
+            ]
+          }
+        }
+      },
+      "required": [
+        "notificationRequestId",
+        "incidentId",
+        "notificationType",
+        "priority",
+        "assetId",
+        "sensorId",
+        "recipients"
+      ]
+    }
+  }
+}
