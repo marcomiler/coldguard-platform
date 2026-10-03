@@ -1,1 +1,2 @@
 com.coldguard.commons.CommonsAutoConfiguration
+com.coldguard.commons.messaging.MessagingAutoConfiguration

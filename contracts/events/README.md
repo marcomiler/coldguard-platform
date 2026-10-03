@@ -67,10 +67,10 @@ directorio define cómo viajan.
 | `SensorRetired` | `asset.sensor-retired` | asset-service | `incident-service.audit`, `telemetry-service.asset-changes` |
 | `TelemetryThresholdBreached` | `telemetry.threshold-breached` | telemetry-service | `incident-service.telemetry-threshold-breached` |
 | `SensorConnectivityLost` | `telemetry.sensor-connectivity-lost` | telemetry-service | `incident-service.audit` |
-| `IncidentCreated` | `incident.incident-created` | incident-service | (sin consumidor hoy) |
-| `IncidentAcknowledged` | `incident.incident-acknowledged` | incident-service | (sin consumidor hoy) |
-| `IncidentEscalated` | `incident.incident-escalated` | incident-service | (sin consumidor hoy) |
-| `IncidentClosed` | `incident.incident-closed` | incident-service | (sin consumidor hoy) |
+| `IncidentCreated` | `incident.incident-created` | incident-service | `incident-service.lifecycle-events` (retención; sin consumidor hoy) |
+| `IncidentAcknowledged` | `incident.incident-acknowledged` | incident-service | `incident-service.lifecycle-events` (retención; sin consumidor hoy) |
+| `IncidentEscalated` | `incident.incident-escalated` | incident-service | `incident-service.lifecycle-events` (retención; sin consumidor hoy) |
+| `IncidentClosed` | `incident.incident-closed` | incident-service | `incident-service.lifecycle-events` (retención; sin consumidor hoy) |
 | `NotificationRequested` | `incident.notification-requested` | incident-service | `notification-service.notification-requested` |
 | `NotificationFailed` | `notification.notification-failed` | notification-service | `incident-service.audit` |
 
