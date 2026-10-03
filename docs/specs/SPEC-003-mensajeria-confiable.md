@@ -39,11 +39,16 @@ CREATE TABLE <schema>.outbox_event (
     payload         JSONB        NOT NULL,      -- envelope completo serializado
     headers         JSONB        NOT NULL,      -- correlation-id, traceparent
     created_at      TIMESTAMPTZ  NOT NULL,
+    next_attempt_at TIMESTAMPTZ  NOT NULL,      -- backoff persistido: no reintentar antes
     published_at    TIMESTAMPTZ  NULL,
+    parked_at       TIMESTAMPTZ  NULL,          -- estacionado tras max-attempts no enrutables
     attempts        INT          NOT NULL DEFAULT 0,
     last_error      VARCHAR(500) NULL
 );
-CREATE INDEX ix_outbox_event_pending ON <schema>.outbox_event (created_at) WHERE published_at IS NULL;
+CREATE INDEX ix_outbox_event_pending ON <schema>.outbox_event (created_at)
+    WHERE published_at IS NULL AND parked_at IS NULL;
+CREATE INDEX ix_outbox_event_pending_aggregate ON <schema>.outbox_event (aggregate_type, aggregate_id)
+    WHERE published_at IS NULL AND parked_at IS NULL;
 ```
 
 - Índice parcial: el relay solo recorre pendientes; el costo no crece con el histórico publicado.
@@ -158,6 +163,7 @@ coldguard:
     batch-size: 100
     confirm-timeout: 5s
     retention: 7d
+    max-attempts: 20
   inbox:
     retention: 7d
 ```
@@ -192,3 +198,49 @@ manual desde la consola de RabbitMQ, documentado en el runbook de SPEC-011).
   bloqueos con `synchronized` en el publicador.
 - Sin limpieza, `outbox_event` y `processed_message` crecen indefinidamente (mitigado por las
   tareas de retención).
+
+## Implementación (2026-10-02)
+
+Implementado en `libs/coldguard-commons` (`com.coldguard.commons.messaging`) con
+auto-configuración, y cableado en asset, telemetry, incident y notification (dependencia AMQP,
+migración Flyway con `outbox_event` y `processed_message`, configuración y colas consumidoras).
+Los listeners de negocio se implementan en SPEC-005 a SPEC-008; hoy solo existen las colas, DLQ y
+bindings.
+
+Verificado contra Spring Boot 4.1.1 (resuelve los "pendiente de verificación" de la sección 7):
+
+- Reintentos: `spring.rabbitmq.listener.simple.retry.{enabled,max-retries,initial-interval,multiplier,max-interval}`
+  siguen vigentes; Spring Boot 4 los aplica con el `RetryTemplate` del core de Spring Framework 7
+  y permite clasificar excepciones con `RabbitListenerRetrySettingsCustomizer`. Commons excluye
+  `AmqpRejectAndDontRequeueException` (base de `PermanentMessageException`) y
+  `MessageConversionException`.
+- Hilos virtuales: con `spring.threads.virtual.enabled=true` Boot configura el contenedor de
+  listeners con un `VirtualThreadTaskExecutor`; no requiere configuración adicional.
+- Colas `quorum`: son el valor por defecto (`coldguard.messaging.queue-type`) y las pruebas de
+  integración corren contra `rabbitmq:3.13-management`, la misma imagen de Compose.
+
+Decisiones de implementación no cubiertas por el diseño original:
+
+- **Backoff persistido** (`next_attempt_at`): el relay solo lee filas que ya toca reintentar, de modo
+  que las filas en backoff no ocupan el lote ni se pierden al reiniciar. El orden por agregado se
+  resuelve en SQL: una fila espera mientras exista una anterior pendiente de su mismo
+  `aggregate_type`/`aggregate_id`.
+- **Estacionamiento** (`parked_at`): con `mandatory=true`, un evento sin cola enlazada vuelve como
+  no enrutable. Tras `coldguard.outbox.max-attempts` el evento se estaciona: deja de reintentarse y
+  de bloquear los siguientes de su agregado (estos se publican, perdiendo el orden respecto al
+  estacionado). Se expone en el gauge `coldguard.outbox.parked` para alertar; se reactiva a mano con
+  `UPDATE outbox_event SET parked_at = NULL, attempts = 0, next_attempt_at = now() WHERE id = ...`.
+- **Una caída del broker nunca estaciona**: conexión perdida, timeout o nack solo aplican backoff y
+  cortan el ciclo (un intento fallido por ciclo, no uno por fila).
+- **Eventos sin consumidor hoy** (`incident.*` salvo `notification-requested`): Incident Service
+  declara la cola acotada `incident-service.lifecycle-events` (TTL 7 días, 10 000 mensajes,
+  `drop-head`, sin DLQ) para que sus routing keys sigan siendo enrutables. Cuando exista un consumidor
+  real se enlaza su propia cola y esa cola de retención se retira.
+- Con varias instancias del relay, `SKIP LOCKED` puede saltar una fila bloqueada por otra instancia y
+  publicar una posterior del mismo agregado; el orden estricto por agregado se garantiza con una
+  sola instancia (caso del MVP local).
+
+Pendiente: runbook de DLQ y parámetros de capacidad (SPEC-011, diferido a Sprint 5-7 según
+`docs/planning/refinement-process.md`); criterios 1, 4 y 5 solo tienen validación manual con
+Compose (criterios 2 y 3 y el comportamiento del relay están cubiertos por pruebas de integración
+con Testcontainers).

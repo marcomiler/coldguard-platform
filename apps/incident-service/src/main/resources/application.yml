@@ -41,10 +41,40 @@ spring:
   flyway:
     schemas: incident
     create-schemas: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:coldguard}
+    password: ${RABBITMQ_PASSWORD:coldguard}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        prefetch: ${RABBITMQ_PREFETCH:10}
+        concurrency: ${RABBITMQ_CONCURRENCY:1}
+        retry:
+          enabled: true
+          max-retries: ${RABBITMQ_RETRY_MAX:3}
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 10s
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+
+coldguard:
+  outbox:
+    enabled: true
+    poll-interval: 500ms
+    batch-size: 100
+    confirm-timeout: 5s
+    retention: 7d
+    max-attempts: 20
+  inbox:
+    retention: 7d
 
 management:
   endpoints:
