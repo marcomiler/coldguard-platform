@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/incident/IncidentAcknowledged.v1.schema.json",
+  "title": "IncidentAcknowledged v1",
+  "description": "The Operations Supervisor acknowledged the incident (actor in the envelope).",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "IncidentAcknowledged"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "incident-service"
+    },
+    "aggregateType": {
+      "const": "Incident"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "incidentId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "acknowledgedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "incidentId",
+        "acknowledgedAt"
+      ]
+    }
+  }
+}

@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package com.coldguard.common.v1;
+
+option java_package = "com.coldguard.common.grpc.v1";
+option java_multiple_files = true;
+
+// Offset pagination for low-volume listings (assets, sensors, users, incidents).
+// `page` is zero-based. `size` = 0 selects the server default; servers reject values above
+// their configured maximum with INVALID_ARGUMENT.
+message PageRequest {
+  int32 page = 1;
+  int32 size = 2;
+}
+
+message PageInfo {
+  int32 page = 1;
+  int32 size = 2;
+  int64 total_elements = 3;
+  int32 total_pages = 4;
+}
+
+// Keyset pagination for high-volume or append-only data (readings, audit, history).
+// `cursor` is opaque; an empty cursor requests the first page.
+message CursorPageRequest {
+  string cursor = 1;
+  int32 size = 2;
+}
+
+message CursorPageInfo {
+  string next_cursor = 1;
+  bool has_more = 2;
+}
+
+enum Criticality {
+  CRITICALITY_UNSPECIFIED = 0;
+  CRITICALITY_LOW = 1;
+  CRITICALITY_MEDIUM = 2;
+  CRITICALITY_HIGH = 3;
+  CRITICALITY_CRITICAL = 4;
+}

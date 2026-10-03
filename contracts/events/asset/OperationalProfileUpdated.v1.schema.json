@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/asset/OperationalProfileUpdated.v1.schema.json",
+  "title": "OperationalProfileUpdated v1",
+  "description": "A sensor operational profile was created or changed.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "OperationalProfileUpdated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "asset-service"
+    },
+    "aggregateType": {
+      "const": "Sensor"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profileVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "previous": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "current": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "sensorId",
+        "profileVersion",
+        "previous",
+        "current"
+      ]
+    }
+  }
+}

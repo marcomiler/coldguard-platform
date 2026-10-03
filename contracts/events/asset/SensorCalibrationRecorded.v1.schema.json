@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/asset/SensorCalibrationRecorded.v1.schema.json",
+  "title": "SensorCalibrationRecorded v1",
+  "description": "A calibration or verification was recorded; the sensor status does not change.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "SensorCalibrationRecorded"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "asset-service"
+    },
+    "aggregateType": {
+      "const": "Sensor"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "calibrationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "CALIBRATION",
+            "VERIFICATION"
+          ]
+        },
+        "performedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "sensorId",
+        "calibrationId",
+        "kind",
+        "performedAt",
+        "validUntil",
+        "reason"
+      ]
+    }
+  }
+}

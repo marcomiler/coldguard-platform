@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/asset/SensorReassigned.v1.schema.json",
+  "title": "SensorReassigned v1",
+  "description": "A sensor was reassigned to another asset (only allowed while IN_MAINTENANCE).",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "SensorReassigned"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "asset-service"
+    },
+    "aggregateType": {
+      "const": "Sensor"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sensorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "previousAssetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "newAssetId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "sensorId",
+        "previousAssetId",
+        "newAssetId",
+        "reason"
+      ]
+    }
+  }
+}

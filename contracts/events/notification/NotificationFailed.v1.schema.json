@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldguard.local/contracts/events/notification/NotificationFailed.v1.schema.json",
+  "title": "NotificationFailed v1",
+  "description": "A notification could not be delivered.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "NotificationFailed"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "notification-service"
+    },
+    "aggregateType": {
+      "const": "Incident"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "notificationRequestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "incidentId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "failureCategory": {
+          "type": "string",
+          "enum": [
+            "PERMANENT",
+            "RETRIES_EXHAUSTED"
+          ]
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "notificationRequestId",
+        "incidentId",
+        "failureCategory",
+        "attempts"
+      ]
+    }
+  }
+}

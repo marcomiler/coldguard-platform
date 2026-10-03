@@ -49,5 +49,5 @@ evento, no un diseño de base de datos ni un contrato serializado final.
 
 Definido en `docs/specs/SPEC-002-contratos.md`: envelope JSON versionado (`eventVersion`),
 exchange `coldguard.events` (topic), routing key `<contexto>.<evento-en-kebab>`, un JSON Schema
-por evento en `contracts/events/` (pendiente de crear) y publicación vía Transactional Outbox
+por evento en `contracts/events/` y publicación vía Transactional Outbox
 (ADR-009). Es diseño decidido, aún no implementado.
