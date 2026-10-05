@@ -29,6 +29,7 @@ Se adopta la **opción 3**: Transactional Outbox para la publicación confiable 
 - ADR-004 (RabbitMQ es el broker destino de la publicación confiable descrita aquí).
 - ADR-005 (Incident Service → Notification Service depende de este patrón para no perder eventos).
 - ADR-006 (la tabla `outbox` de cada servicio vive dentro de su propio esquema lógico).
+- ADR-011 (orden por agregado: `aggregateVersion` y bloqueo de eventos estacionados).
 
 ## Evolución futura a Azure
 **Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el

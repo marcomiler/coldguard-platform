@@ -226,10 +226,22 @@ Decisiones de implementación no cubiertas por el diseño original:
   resuelve en SQL: una fila espera mientras exista una anterior pendiente de su mismo
   `aggregate_type`/`aggregate_id`.
 - **Estacionamiento** (`parked_at`): con `mandatory=true`, un evento sin cola enlazada vuelve como
-  no enrutable. Tras `coldguard.outbox.max-attempts` el evento se estaciona: deja de reintentarse y
-  de bloquear los siguientes de su agregado (estos se publican, perdiendo el orden respecto al
-  estacionado). Se expone en el gauge `coldguard.outbox.parked` para alertar; se reactiva a mano con
-  `UPDATE outbox_event SET parked_at = NULL, attempts = 0, next_attempt_at = now() WHERE id = ...`.
+  no enrutable. Tras `coldguard.outbox.max-attempts` el evento se estaciona: deja de reintentarse
+  pero **sigue bloqueando** a los siguientes de su agregado (ADR-011), que esperan a que se
+  resuelva; los demás agregados siguen fluyendo. Se expone en el gauge `coldguard.outbox.parked`
+  para alertar. Se reactiva a mano (tras enlazar la cola que falta) con
+  `UPDATE outbox_event SET parked_at = NULL, attempts = 0, next_attempt_at = now() WHERE id = ...`,
+  o se descarta con `DELETE` si el evento ya no debe publicarse (los siguientes salen entonces; el
+  consumidor ordenado verá un hueco, ver abajo).
+- **Orden por agregado** (ADR-011): `OutboxWriter` asigna `aggregateVersion` con un upsert sobre
+  `aggregate_sequence` en la misma transacción y lo guarda en `outbox_event.aggregate_version` y en
+  el envelope. Los consumidores con estado por agregado usan `InboxGuard.runInOrder(envelope,
+  consumer, efecto)`: aplica solo la versión siguiente a la del cursor (`aggregate_cursor`), descarta
+  duplicados y obsoletos, y lanza `OutOfOrderEventException` ante un hueco (error transitorio:
+  reintento con backoff y, agotado, DLQ). Los consumidores que no dependen del orden siguen con
+  `runOnce`. Un hueco permanente (evento descartado a mano) deja ese agregado detenido hasta
+  ajustar `aggregate_cursor.last_version`; es la intervención manual descrita en el runbook de
+  SPEC-011.
 - **Una caída del broker nunca estaciona**: conexión perdida, timeout o nack solo aplican backoff y
   cortan el ciclo (un intento fallido por ciclo, no uno por fila).
 - **Eventos sin consumidor hoy** (`incident.*` salvo `notification-requested`): Incident Service
@@ -237,8 +249,9 @@ Decisiones de implementación no cubiertas por el diseño original:
   `drop-head`, sin DLQ) para que sus routing keys sigan siendo enrutables. Cuando exista un consumidor
   real se enlaza su propia cola y esa cola de retención se retira.
 - Con varias instancias del relay, `SKIP LOCKED` puede saltar una fila bloqueada por otra instancia y
-  publicar una posterior del mismo agregado; el orden estricto por agregado se garantiza con una
-  sola instancia (caso del MVP local).
+  publicar una posterior del mismo agregado; el orden de publicación estricto se da con una sola
+  instancia (MVP local), pero la corrección ya no depende de ello: el consumidor ordenado lo absorbe
+  con `aggregateVersion`.
 
 Pendiente: runbook de DLQ y parámetros de capacidad (SPEC-011, diferido a Sprint 5-7 según
 `docs/planning/refinement-process.md`); criterios 1, 4 y 5 solo tienen validación manual con

@@ -21,9 +21,19 @@ public class OutboxWriter implements DomainEventPublisher {
   private static final String INSERT =
       """
       INSERT INTO outbox_event
-        (id, aggregate_type, aggregate_id, event_type, event_version, routing_key,
-         payload, headers, created_at, next_attempt_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
+        (id, aggregate_type, aggregate_id, aggregate_version, event_type, event_version,
+         routing_key, payload, headers, created_at, next_attempt_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
+      """;
+
+  /** The row lock taken by the upsert serializes concurrent writers of the same aggregate. */
+  private static final String NEXT_VERSION =
+      """
+      INSERT INTO aggregate_sequence (aggregate_type, aggregate_id, last_version)
+      VALUES (?, ?, 1)
+      ON CONFLICT (aggregate_type, aggregate_id)
+      DO UPDATE SET last_version = aggregate_sequence.last_version + 1
+      RETURNING last_version
       """;
 
   private final JdbcClient jdbc;
@@ -50,6 +60,11 @@ public class OutboxWriter implements DomainEventPublisher {
     UUID eventId = UUID.randomUUID();
     Instant now = clock.instant();
     String correlationId = CorrelationContext.current().orElse(null);
+    long aggregateVersion =
+        jdbc.sql(NEXT_VERSION)
+            .params(event.aggregateType(), event.aggregateId())
+            .query(Long.class)
+            .single();
     EventEnvelope envelope =
         new EventEnvelope(
             eventId,
@@ -59,6 +74,7 @@ public class OutboxWriter implements DomainEventPublisher {
             producer,
             event.aggregateType(),
             event.aggregateId(),
+            aggregateVersion,
             correlationId,
             event.actor(),
             mapper.valueToTree(event.payload()));
@@ -77,6 +93,7 @@ public class OutboxWriter implements DomainEventPublisher {
             eventId,
             event.aggregateType(),
             event.aggregateId(),
+            aggregateVersion,
             event.eventType(),
             event.eventVersion(),
             event.routingKey(),

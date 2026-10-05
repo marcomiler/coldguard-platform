@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import com.coldguard.commons.correlation.CorrelationContext;
+import com.coldguard.commons.messaging.error.OutOfOrderEventException;
 import com.coldguard.commons.messaging.inbox.InboxGuard;
 import com.coldguard.commons.messaging.outbox.DomainEventPublisher;
 import com.coldguard.commons.messaging.outbox.OutboundEvent;
@@ -139,6 +140,8 @@ class ReliableMessagingIntegrationTest {
     tx = new TransactionTemplate(txManager);
     jdbc.sql("DELETE FROM outbox_event").update();
     jdbc.sql("DELETE FROM processed_message").update();
+    jdbc.sql("DELETE FROM aggregate_sequence").update();
+    jdbc.sql("DELETE FROM aggregate_cursor").update();
     TestApp.EFFECTS.set(0);
     CorrelationContext.clear();
     admin.purgeQueue(QUEUE, false);
@@ -314,11 +317,12 @@ class ReliableMessagingIntegrationTest {
   }
 
   @Test
-  void unroutableEventIsParkedAfterMaxAttemptsAndStopsBlockingItsAggregate() {
+  void parkedEventHoldsItsAggregateUntilResolved() {
     tx.executeWithoutResult(
         s -> {
           publisher.publish(event("test.nobody-listens", "thing-1"));
           publisher.publish(event(ROUTING_KEY, "thing-1"));
+          publisher.publish(event(ROUTING_KEY, "thing-2"));
         });
     for (int i = 0; i < 3; i++) {
       relay.relayPending();
@@ -329,16 +333,89 @@ class ReliableMessagingIntegrationTest {
                 .query(Long.class)
                 .single())
         .isEqualTo(1);
-    assertThat(TestApp.EFFECTS).hasValue(0); // still held behind the failing event
+    relay.relayPending();
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertThat(TestApp.EFFECTS).hasValue(1)); // thing-2 only
+    assertThat(pending()).isEqualTo(1); // thing-1's later event is still held behind the parked
 
+    jdbc.sql("DELETE FROM outbox_event WHERE parked_at IS NOT NULL").update(); // operator discards
     relay.relayPending();
 
     await()
         .atMost(Duration.ofSeconds(10))
-        .untilAsserted(() -> assertThat(TestApp.EFFECTS).hasValue(1));
+        .untilAsserted(() -> assertThat(TestApp.EFFECTS).hasValue(2));
     assertThat(pending()).isZero();
-    relay.relayPending();
-    assertThat(attempts()).isEqualTo(3); // the parked event is no longer retried
+  }
+
+  @Test
+  void eventsOfAnAggregateGetConsecutiveVersionsIndependentOfOtherAggregates() {
+    tx.executeWithoutResult(
+        s -> {
+          publisher.publish(event(ROUTING_KEY, "thing-1"));
+          publisher.publish(event(ROUTING_KEY, "thing-2"));
+          publisher.publish(event(ROUTING_KEY, "thing-1"));
+        });
+
+    assertThat(
+            jdbc.sql(
+                    "SELECT payload->>'aggregateId' || ':' || aggregate_version FROM outbox_event"
+                        + " ORDER BY created_at, aggregate_version")
+                .query(String.class)
+                .list())
+        .containsExactlyInAnyOrder("thing-1:1", "thing-2:1", "thing-1:2");
+    assertThat(
+            jdbc.sql(
+                    "SELECT payload->>'aggregateVersion' FROM outbox_event WHERE aggregate_version = 2")
+                .query(String.class)
+                .single())
+        .isEqualTo("2");
+  }
+
+  private EventEnvelope versioned(String aggregateId, Long version) {
+    return new EventEnvelope(
+        UUID.randomUUID(),
+        "ThingHappened",
+        1,
+        java.time.Instant.now(),
+        "test-service",
+        "Thing",
+        aggregateId,
+        version,
+        null,
+        EventActor.system("test"),
+        objectMapper.createObjectNode());
+  }
+
+  @Test
+  void consumerAppliesVersionsInOrderDropsStaleAndRejectsGaps() {
+    AtomicInteger applied = new AtomicInteger();
+
+    assertThatThrownBy(() -> inbox.runInOrder(versioned("t", 2L), "c", applied::incrementAndGet))
+        .isInstanceOf(OutOfOrderEventException.class);
+    assertThat(applied).hasValue(0);
+    assertThat(jdbc.sql("SELECT count(*) FROM processed_message").query(Long.class).single())
+        .isZero(); // the gap rolled back the claim, so the redelivery is processed
+
+    assertThat(inbox.runInOrder(versioned("t", 1L), "c", applied::incrementAndGet)).isTrue();
+    EventEnvelope second = versioned("t", 2L);
+    assertThat(inbox.runInOrder(second, "c", applied::incrementAndGet)).isTrue();
+    assertThat(inbox.runInOrder(second, "c", applied::incrementAndGet)).isFalse(); // duplicate
+    assertThat(inbox.runInOrder(versioned("t", 1L), "c", applied::incrementAndGet))
+        .isFalse(); // stale
+    assertThat(applied).hasValue(2);
+    assertThat(
+            inbox.runInOrder(versioned("other", 1L), "c", applied::incrementAndGet)) // own cursor
+        .isTrue();
+  }
+
+  @Test
+  void consumerTreatsUnversionedEventsAsUnsequenced() {
+    AtomicInteger applied = new AtomicInteger();
+
+    assertThat(inbox.runInOrder(versioned("t", null), "c", applied::incrementAndGet)).isTrue();
+    assertThat(inbox.runInOrder(versioned("t", null), "c", applied::incrementAndGet)).isTrue();
+    assertThat(applied).hasValue(2);
   }
 
   @Test

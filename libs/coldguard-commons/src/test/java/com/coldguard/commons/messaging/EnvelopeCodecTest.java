@@ -32,6 +32,7 @@ class EnvelopeCodecTest {
             "incident-service",
             "Incident",
             "inc-1",
+            3L,
             "corr-1",
             EventActor.system("connectivity-monitor"),
             mapper.createObjectNode().put("priority", "P1"));
@@ -53,10 +54,13 @@ class EnvelopeCodecTest {
             "Incident",
             "inc-1",
             null,
+            null,
             EventActor.user("u-1"),
             mapper.createObjectNode());
 
-    assertThat(codec.write(envelope)).doesNotContain("correlationId");
+    assertThat(codec.write(envelope))
+        .doesNotContain("correlationId")
+        .doesNotContain("aggregateVersion");
   }
 
   @Test
