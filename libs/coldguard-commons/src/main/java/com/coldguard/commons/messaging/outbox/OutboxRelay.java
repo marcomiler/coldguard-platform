@@ -33,8 +33,9 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Publishes pending outbox rows with publisher confirms. Each cycle runs in one short transaction
  * that locks its batch with {@code FOR UPDATE SKIP LOCKED}, so several instances never publish the
- * same row concurrently. A crash between broker confirm and commit republishes the row, which the
- * idempotent consumers absorb.
+ * same row concurrently. A parked event holds back the later events of its aggregate until someone
+ * resolves it, so the aggregate is never published out of order. A crash between broker confirm and
+ * commit republishes the row, which the idempotent consumers absorb.
  */
 public class OutboxRelay {
 
@@ -55,8 +56,7 @@ public class OutboxRelay {
                 WHERE earlier.aggregate_type = o.aggregate_type
                   AND earlier.aggregate_id = o.aggregate_id
                   AND earlier.published_at IS NULL
-                  AND earlier.parked_at IS NULL
-                  AND earlier.next_attempt_at > ?
+                  AND (earlier.parked_at IS NOT NULL OR earlier.next_attempt_at > ?)
                   AND (earlier.created_at, earlier.id) < (o.created_at, o.id))
        ORDER BY o.created_at, o.id
        LIMIT ?

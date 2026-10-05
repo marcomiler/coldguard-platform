@@ -15,6 +15,7 @@ public record EventEnvelope(
     String producer,
     String aggregateType,
     String aggregateId,
+    Long aggregateVersion,
     String correlationId,
     EventActor actor,
     JsonNode payload) {}

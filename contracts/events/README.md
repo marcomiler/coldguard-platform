@@ -20,6 +20,7 @@ directorio define cómo viajan.
   "producer": "incident-service",
   "aggregateType": "Incident",
   "aggregateId": "uuid",
+  "aggregateVersion": 1,
   "correlationId": "corr-123",
   "actor": { "type": "USER | SYSTEM", "id": "string" },
   "payload": {}
@@ -29,6 +30,10 @@ directorio define cómo viajan.
 - `actor` es obligatorio en todos los eventos: la persona que ejecutó la acción (`USER`) o el
   proceso automático (`SYSTEM`, con el nombre del proceso, p. ej. `calibration-expiry-job`,
   `connectivity-monitor`).
+- `aggregateVersion` (entero ≥ 1) es la secuencia del evento dentro de su agregado, asignada por el
+  productor en la misma transacción que el cambio de estado. Los consumidores con estado por
+  agregado aplican un evento solo si es el siguiente esperado (ADR-011). Es opcional en el
+  esquema (cambio aditivo de `v1`); los productores de `coldguard-commons` siempre lo emiten.
 - `correlationId` es opcional y solo admite `[A-Za-z0-9._-]{1,100}`.
 - El envelope no admite campos adicionales; el `payload` sí (los consumidores ignoran campos que
   no conocen).

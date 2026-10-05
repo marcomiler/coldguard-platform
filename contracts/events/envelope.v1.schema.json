@@ -35,6 +35,11 @@
       "type": "string",
       "minLength": 1
     },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic sequence of the event within its aggregate (1, 2, 3...). Consumers that keep per-aggregate state apply an event only when it is the next expected one. Absent in events from producers that do not sequence yet."
+    },
     "correlationId": {
       "type": "string",
       "pattern": "^[A-Za-z0-9._-]{1,100}$"
