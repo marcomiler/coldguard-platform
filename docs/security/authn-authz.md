@@ -88,9 +88,9 @@ Notas:
   `gateway`. De cualquier otro cliente con certificado válido (p. ej. el simulador) la ignora y la
   llamada se trata como sin actor. Los servicios internos nunca leen `Authorization`.
 - **Llamadores de sistema.** Un servicio interno que llama con su propio certificado y no en nombre
-  de un usuario (hoy, Telemetry leyendo el contexto de evaluación de Asset) es un actor
+  de un usuario (hoy, Telemetry leyendo el contexto de evaluación de Asset, y el simulador `sensor-simulator` enviando lecturas a Telemetry) es un actor
   `system:<nombre>`. Se reconoce por el CN de su certificado, solo si figura en
-  `coldguard.security.system-callers` del servicio que recibe la llamada (Asset: `telemetry-service`);
+  `coldguard.security.system-callers` del servicio que recibe la llamada (Asset: `telemetry-service`; Telemetry: `sensor-simulator`);
   cualquier metadata de identidad que envíe se ignora. El Gateway nunca puede propagar un actor
   `system:`. Un llamador de sistema no tiene roles: no puede ejecutar comandos de usuarios.
 - Defensa en profundidad: los casos de uso sensibles validan el rol en `application` (hoy,

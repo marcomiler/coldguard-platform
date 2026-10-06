@@ -48,6 +48,8 @@ class OpenApiContractTest {
     registry.add("spring.grpc.client.channels.asset-service.address", () -> "static://localhost:1");
     registry.add(
         "spring.grpc.client.channels.incident-service.address", () -> "static://localhost:1");
+    registry.add(
+        "spring.grpc.client.channels.telemetry-service.address", () -> "static://localhost:1");
     registry.add("coldguard.gateway.downstream.asset-service.deadline", () -> "500ms");
   }
 

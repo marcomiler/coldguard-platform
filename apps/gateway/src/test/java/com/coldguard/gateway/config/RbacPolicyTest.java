@@ -48,6 +48,8 @@ class RbacPolicyTest {
     // Asset routes are real controllers now; point their channel at a closed port with a short
     // deadline so an allowed role gets a fast 503 (never 401/403) without needing a service.
     registry.add("spring.grpc.client.channels.asset-service.address", () -> "static://localhost:1");
+    registry.add(
+        "spring.grpc.client.channels.telemetry-service.address", () -> "static://localhost:1");
     registry.add("coldguard.gateway.downstream.asset-service.deadline", () -> "500ms");
   }
 
