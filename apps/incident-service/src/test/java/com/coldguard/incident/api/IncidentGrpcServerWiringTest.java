@@ -47,6 +47,7 @@ import org.springframework.grpc.server.exception.GrpcExceptionHandlerInterceptor
 class IncidentGrpcServerWiringTest {
 
   private IncidentRepository repository;
+  private boolean trustedPeer = true;
   private Server server;
   private ManagedChannel channel;
 
@@ -62,7 +63,7 @@ class IncidentGrpcServerWiringTest {
             .addService(
                 ServerInterceptors.intercept(
                     service,
-                    new ActorRoleServerInterceptor(),
+                    new ActorServerInterceptor(attributes -> trustedPeer),
                     new GrpcExceptionHandlerInterceptor(new IncidentGrpcExceptionHandler())))
             .build()
             .start();
@@ -75,7 +76,7 @@ class IncidentGrpcServerWiringTest {
     server.shutdownNow();
   }
 
-  private IncidentServiceGrpc.IncidentServiceBlockingStub stub(String actorRole) {
+  private IncidentServiceGrpc.IncidentServiceBlockingStub stub(String actorRoles) {
     ClientInterceptor roleHeader =
         new ClientInterceptor() {
           @Override
@@ -85,8 +86,9 @@ class IncidentGrpcServerWiringTest {
                 next.newCall(method, options)) {
               @Override
               public void start(Listener<RespT> listener, Metadata headers) {
-                if (actorRole != null) {
-                  headers.put(ActorRoleServerInterceptor.ACTOR_ROLE_KEY, actorRole);
+                if (actorRoles != null) {
+                  headers.put(ActorServerInterceptor.ACTOR_ID_KEY, "user-1");
+                  headers.put(ActorServerInterceptor.ACTOR_ROLES_KEY, actorRoles);
                 }
                 super.start(listener, headers);
               }
@@ -152,6 +154,22 @@ class IncidentGrpcServerWiringTest {
   }
 
   @Test
+  void close_identityFromUntrustedPeer_isIgnoredAndMapsToPermissionDenied() {
+    trustedPeer = false;
+    CloseIncidentRequest request =
+        CloseIncidentRequest.newBuilder()
+            .setIncidentId("i1")
+            .setCause("c")
+            .setResolutionComment("r")
+            .build();
+
+    assertThatThrownBy(() -> stub("MAINTENANCE_TECHNICIAN").closeIncident(request))
+        .isInstanceOfSatisfying(
+            StatusRuntimeException.class,
+            ex -> assertThat(codeOf(ex)).isEqualTo(Status.Code.PERMISSION_DENIED));
+  }
+
+  @Test
   void close_withoutActorRoleMetadata_mapsToPermissionDenied() {
     CloseIncidentRequest request =
         CloseIncidentRequest.newBuilder()
@@ -176,7 +194,7 @@ class IncidentGrpcServerWiringTest {
             .setResolutionComment("r")
             .build();
 
-    assertThatThrownBy(() -> stub("ROLE_MAINTENANCE_TECHNICIAN").closeIncident(request))
+    assertThatThrownBy(() -> stub("MAINTENANCE_TECHNICIAN").closeIncident(request))
         .isInstanceOfSatisfying(
             StatusRuntimeException.class,
             ex -> assertThat(codeOf(ex)).isEqualTo(Status.Code.NOT_FOUND));
@@ -191,7 +209,7 @@ class IncidentGrpcServerWiringTest {
             .setResolutionComment("r")
             .build();
 
-    assertThatThrownBy(() -> stub("ROLE_MAINTENANCE_TECHNICIAN").closeIncident(request))
+    assertThatThrownBy(() -> stub("MAINTENANCE_TECHNICIAN").closeIncident(request))
         .isInstanceOfSatisfying(
             StatusRuntimeException.class,
             ex -> assertThat(codeOf(ex)).isEqualTo(Status.Code.INVALID_ARGUMENT));

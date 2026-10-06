@@ -1,5 +1,6 @@
 package com.coldguard.gateway.config;
 
+import com.coldguard.identity.grpc.v1.IdentityServiceGrpc;
 import com.coldguard.incident.grpc.v1.IncidentServiceGrpc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,5 +13,12 @@ public class GrpcClientConfig {
   IncidentServiceGrpc.IncidentServiceBlockingStub incidentServiceBlockingStub(
       GrpcChannelFactory channels) {
     return IncidentServiceGrpc.newBlockingStub(channels.createChannel("incident-service"));
+  }
+
+  /** Identity & Access is a module of Incident Service, so it shares that service's channel. */
+  @Bean
+  IdentityServiceGrpc.IdentityServiceBlockingStub identityServiceBlockingStub(
+      GrpcChannelFactory channels) {
+    return IdentityServiceGrpc.newBlockingStub(channels.createChannel("incident-service"));
   }
 }

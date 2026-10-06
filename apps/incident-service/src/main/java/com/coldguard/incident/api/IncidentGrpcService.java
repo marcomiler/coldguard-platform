@@ -55,7 +55,7 @@ public class IncidentGrpcService extends IncidentServiceGrpc.IncidentServiceImpl
             request.getIncidentId(),
             request.getCause(),
             request.getResolutionComment(),
-            ActorRoleServerInterceptor.ACTOR_ROLE_CONTEXT_KEY.get());
+            ActorServerInterceptor.ACTOR_CONTEXT_KEY.get());
     Incident incident = closeIncidentService.close(command);
     responseObserver.onNext(toCloseResponse(incident));
     responseObserver.onCompleted();

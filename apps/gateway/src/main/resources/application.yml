@@ -31,6 +31,24 @@ spring:
           truststore:
             certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/ca/ca.crt
 
+coldguard:
+  gateway:
+    cors:
+      # Explicit origins only ('*' is rejected at startup); empty means no cross-origin access.
+      allowed-origins: ${COLDGUARD_CORS_ALLOWED_ORIGINS:}
+    technical-endpoints:
+      # POST /api/v1/incidents is a technical entry point, closed unless explicitly enabled.
+      enabled: ${COLDGUARD_TECHNICAL_ENDPOINTS_ENABLED:false}
+  security:
+    jwt:
+      # Required, no defaults: the gateway refuses to start without its key pair. Generate them
+      # with deploy/scripts/generate-dev-certs.sh.
+      issuer: ${JWT_ISSUER:coldguard-local}
+      private-key-path: ${JWT_PRIVATE_KEY_PATH:}
+      public-key-path: ${JWT_PUBLIC_KEY_PATH:}
+      ttl: ${JWT_TTL:1h}
+      clock-skew: ${JWT_CLOCK_SKEW:30s}
+
 management:
   server:
     # Separate port so actuator is reachable inside the Compose network but is not part of the

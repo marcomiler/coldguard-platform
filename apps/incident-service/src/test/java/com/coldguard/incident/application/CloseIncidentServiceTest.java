@@ -12,14 +12,17 @@ import com.coldguard.incident.domain.IncidentAlreadyClosedException;
 import com.coldguard.incident.domain.IncidentStatus;
 import com.coldguard.incident.domain.Priority;
 import com.coldguard.incident.domain.Urgency;
+import com.coldguard.incident.identity.domain.Role;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** Pure unit test: IncidentRepository is mocked, no database involved. */
 class CloseIncidentServiceTest {
 
-  private static final String AUTHORIZED_ROLE = "ROLE_MAINTENANCE_TECHNICIAN";
+  private static final Actor AUTHORIZED_ROLE =
+      new Actor("tech-1", Set.of(Role.MAINTENANCE_TECHNICIAN));
 
   private final IncidentRepository incidentRepository = mock(IncidentRepository.class);
   private final CloseIncidentService service = new CloseIncidentService(incidentRepository);
@@ -44,7 +47,10 @@ class CloseIncidentServiceTest {
             () ->
                 service.close(
                     new CloseIncidentCommand(
-                        "incident-1", "overheating", "replaced sensor", "ROLE_SUPERVISOR")))
+                        "incident-1",
+                        "overheating",
+                        "replaced sensor",
+                        new Actor("sup-1", Set.of(Role.OPERATIONS_SUPERVISOR)))))
         .isInstanceOf(IncidentCloseForbiddenException.class);
   }
 

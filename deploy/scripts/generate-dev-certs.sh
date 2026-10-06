@@ -10,6 +10,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CERTS_DIR="$REPO_ROOT/deploy/local/certs"
 CA_DIR="$CERTS_DIR/ca"
+# The JWT signing key pair lives outside certs/ on purpose: certs/ is mounted into every internal
+# service, but only the Gateway may ever see the private signing key.
+JWT_DIR="$REPO_ROOT/deploy/local/jwt"
 
 # Identities that also act as gRPC servers get hostname SANs; client-only identities get none.
 SERVER_IDENTITIES=(asset-service telemetry-service incident-service)
@@ -17,16 +20,21 @@ CLIENT_IDENTITIES=(gateway sensor-simulator)
 
 VALIDITY_DAYS=825
 FORCE=false
+JWT_ONLY=false
 
 usage() {
-  echo "Usage: $0 [--force]"
-  echo "  --force  Overwrite existing certificates. Without it, the script refuses to"
-  echo "           run if deploy/local/certs already contains a CA or leaf certificate."
+  echo "Usage: $0 [--force] [--jwt-only]"
+  echo "  --force     Overwrite existing certificates and JWT keys. Without it, the script"
+  echo "              refuses to run if deploy/local/certs already contains a CA or leaf"
+  echo "              certificate, or deploy/local/jwt already contains a key."
+  echo "  --jwt-only  Only generate the Gateway's JWT signing key pair (deploy/local/jwt),"
+  echo "              leaving the mTLS certificates untouched."
 }
 
 for arg in "$@"; do
   case "$arg" in
     --force) FORCE=true ;;
+    --jwt-only) JWT_ONLY=true ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $arg" >&2; usage >&2; exit 1 ;;
   esac
@@ -35,6 +43,31 @@ done
 if ! command -v openssl >/dev/null 2>&1; then
   echo "ERROR: openssl is required to generate development certificates but was not found in PATH." >&2
   exit 1
+fi
+
+generate_jwt_keys() {
+  if [[ "$FORCE" != "true" ]]; then
+    for existing in "$JWT_DIR/jwt-private.pem" "$JWT_DIR/jwt-public.pem"; do
+      if [[ -f "$existing" ]]; then
+        echo "ERROR: $existing already exists. Re-run with --force to regenerate the JWT keys." >&2
+        echo "Regenerating invalidates every access token issued so far." >&2
+        exit 1
+      fi
+    done
+  fi
+  mkdir -p "$JWT_DIR"
+  echo "Generating Gateway JWT signing key pair (RS256, 2048 bits)..."
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$JWT_DIR/jwt-private.pem"
+  openssl pkey -in "$JWT_DIR/jwt-private.pem" -pubout -out "$JWT_DIR/jwt-public.pem"
+  # Read by the Gateway container's non-root user through its group (see the key note below).
+  chmod 640 "$JWT_DIR/jwt-private.pem"
+  chmod 644 "$JWT_DIR/jwt-public.pem"
+  echo "  $JWT_DIR/jwt-private.pem / jwt-public.pem"
+}
+
+if [[ "$JWT_ONLY" == "true" ]]; then
+  generate_jwt_keys
+  exit 0
 fi
 
 if [[ "$FORCE" != "true" ]]; then
@@ -112,3 +145,5 @@ echo "  $CA_DIR/ca.crt / ca.key"
 for name in "${SERVER_IDENTITIES[@]}" "${CLIENT_IDENTITIES[@]}"; do
   echo "  $CERTS_DIR/$name/$name.crt / $name.key"
 done
+
+generate_jwt_keys
