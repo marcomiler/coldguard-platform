@@ -2,6 +2,8 @@ package com.coldguard.gateway.api.asset;
 
 import com.coldguard.asset.grpc.v1.GetOperationalProfileRequest;
 import com.coldguard.asset.grpc.v1.GetSensorRequest;
+import com.coldguard.gateway.api.common.CursorPageResponse;
+import com.coldguard.gateway.api.common.PageResponse;
 import com.coldguard.gateway.infrastructure.AssetGrpcClient;
 import jakarta.validation.Valid;
 import java.net.URI;

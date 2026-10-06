@@ -166,8 +166,14 @@ negocio del trailer intacto y sin reenviar nunca la descripción de un error int
 `ApiExceptionHandler` único con Problem Details (`code`, `correlationId`, `errors` por campo sin
 eco del valor), DTO como `record` con Bean Validation y enums REST propios, paginación por
 página y por cursor. El advice se aplica por paquete (`api.asset`); Incident, Identity y Auth
-siguen con sus excepciones y advices propios hasta migrarlos. Pendiente: migrar esas rutas,
-OpenAPI (`contracts/rest/openapi.yaml`) y el límite de tamaño del cuerpo.
+siguen con sus excepciones y advices propios hasta migrarlos (la lista de usuarios ya usa el sobre
+de paginación común). `contracts/rest/openapi.yaml` existe, escrito a mano (no se verificó una
+versión de `springdoc-openapi` compatible con Spring Boot 4.1.1): cubre todo el catálogo, con cada
+operación marcada `implemented` o `planned`, y `OpenApiContractTest` impide que se separe del
+código (las rutas coinciden en ambos sentidos, los roles coinciden con la cadena de seguridad real,
+las referencias resuelven y ningún esquema compartido usa enums con prefijo de protocolo). Los
+ejemplos de error y el esquema Bearer están declarados. Pendiente: migrar las rutas de Incident,
+Identity y Auth a estas convenciones, y el límite de tamaño del cuerpo.
 
 ## Tareas
 

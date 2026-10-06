@@ -1,5 +1,6 @@
 package com.coldguard.gateway.api;
 
+import com.coldguard.gateway.api.common.PageResponse;
 import com.coldguard.gateway.infrastructure.IdentityGrpcClient;
 import com.coldguard.gateway.infrastructure.UserAdministrationException;
 import org.springframework.http.HttpStatus;
@@ -28,15 +29,13 @@ public class UserController {
   }
 
   @GetMapping
-  public UserPageHttpResponse list(
+  public PageResponse<UserHttpResponse> list(
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
     var result = identity.listUsers(page, size);
-    return new UserPageHttpResponse(
+    return new PageResponse<>(
         result.users().stream().map(UserHttpResponse::of).toList(),
-        result.page(),
-        result.size(),
-        result.totalElements(),
-        result.totalPages());
+        new PageResponse.PageInfo(
+            result.page(), result.size(), result.totalElements(), result.totalPages()));
   }
 
   @GetMapping("/{userId}")

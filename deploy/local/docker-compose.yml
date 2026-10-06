@@ -85,6 +85,9 @@ services:
       TLS_CERTS_DIR: /certs
       # Placeholder academic value (90 days) so a calibration can be recorded in the local demo.
       ASSET_CALIBRATION_DEFAULT_VALIDITY: ${ASSET_CALIBRATION_DEFAULT_VALIDITY:-P90D}
+      # How often the job moves sensors with an expired calibration to maintenance (5 minutes by
+      # default; use '0 * * * * *' for every minute in a demo).
+      ASSET_CALIBRATION_EXPIRY_CRON: "${ASSET_CALIBRATION_EXPIRY_CRON:-0 */5 * * * *}"
     volumes:
       - ./certs:/certs:ro
     healthcheck:

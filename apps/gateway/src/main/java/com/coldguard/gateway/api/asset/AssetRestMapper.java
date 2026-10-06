@@ -19,6 +19,7 @@ import com.coldguard.asset.grpc.v1.UpsertOperationalProfileRequest;
 import com.coldguard.common.grpc.v1.CursorPageRequest;
 import com.coldguard.common.grpc.v1.PageInfo;
 import com.coldguard.common.grpc.v1.PageRequest;
+import com.coldguard.gateway.api.common.PageResponse;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Timestamp;
