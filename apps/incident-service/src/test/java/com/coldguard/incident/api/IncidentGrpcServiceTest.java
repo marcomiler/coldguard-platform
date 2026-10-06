@@ -2,6 +2,7 @@ package com.coldguard.incident.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.coldguard.incident.application.Actor;
 import com.coldguard.incident.application.CloseIncidentService;
 import com.coldguard.incident.application.CreateIncidentService;
 import com.coldguard.incident.application.IncidentRepository;
@@ -14,10 +15,12 @@ import com.coldguard.incident.grpc.v1.Criticality;
 import com.coldguard.incident.grpc.v1.IncidentStatus;
 import com.coldguard.incident.grpc.v1.Magnitude;
 import com.coldguard.incident.grpc.v1.Priority;
+import com.coldguard.incident.identity.domain.Role;
 import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,12 +29,13 @@ import org.junit.jupiter.api.Test;
  * Exercises the service method directly through a captured {@link StreamObserver}, without a real
  * gRPC transport. IncidentRepository is an in-memory fake, not the real persistence adapter (see
  * IncidentRepositoryAdapterTest for that). closeIncident() reads the actor role from gRPC Context
- * (populated by ActorRoleServerInterceptor in production, not run here), so tests set it explicitly
- * via Context.current().withValue(...).
+ * (populated by ActorServerInterceptor in production, not run here), so tests set it explicitly via
+ * Context.current().withValue(...).
  */
 class IncidentGrpcServiceTest {
 
-  private static final String AUTHORIZED_ROLE = "ROLE_MAINTENANCE_TECHNICIAN";
+  private static final Actor AUTHORIZED_ROLE =
+      new Actor("tech-1", Set.of(Role.MAINTENANCE_TECHNICIAN));
 
   private InMemoryIncidentRepository repository;
   private IncidentGrpcService grpcService;
@@ -172,7 +176,9 @@ class IncidentGrpcServiceTest {
             .build();
     CapturingObserver<CloseIncidentResponse> observer = new CapturingObserver<>();
 
-    withActorRole("ROLE_SUPERVISOR", () -> grpcService.closeIncident(request, observer));
+    withActorRole(
+        new Actor("sup-1", Set.of(Role.OPERATIONS_SUPERVISOR)),
+        () -> grpcService.closeIncident(request, observer));
 
     assertThat(observer.response).isNull();
     assertThat(Status.fromThrowable(observer.error).getCode())
@@ -211,9 +217,8 @@ class IncidentGrpcServiceTest {
     return incident;
   }
 
-  private static void withActorRole(String role, Runnable runnable) throws Exception {
-    Context context =
-        Context.current().withValue(ActorRoleServerInterceptor.ACTOR_ROLE_CONTEXT_KEY, role);
+  private static void withActorRole(Actor actor, Runnable runnable) throws Exception {
+    Context context = Context.current().withValue(ActorServerInterceptor.ACTOR_CONTEXT_KEY, actor);
     Context previous = context.attach();
     try {
       runnable.run();

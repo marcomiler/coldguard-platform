@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -38,6 +39,9 @@ class IncidentControllerCloseTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private IncidentGrpcClient incidentGrpcClient;
+
+  // The filter chain needs a decoder; these tests inject the authentication directly.
+  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void closeIncident_authorizedActor_returns200() throws Exception {

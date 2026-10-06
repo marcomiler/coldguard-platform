@@ -33,6 +33,12 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-amqp</artifactId>
     </dependency>
+    <!-- Password hashing only: the standalone crypto jar, not the Spring Security starter, which
+         stays exclusive to the gateway. -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-crypto</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
@@ -60,6 +66,14 @@
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-inprocess</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Test-only: issues ephemeral CA and leaf certificates in memory for the real mTLS test of
+         the actor interceptor; the JDK cannot sign a leaf certificate with an arbitrary CA. -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <version>1.79</version>
       <scope>test</scope>
     </dependency>
     <dependency>

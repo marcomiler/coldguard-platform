@@ -119,7 +119,8 @@ hay contraseñas en migraciones ni en el repositorio.
   previa a expiración no se implementa: se acepta como limitación documentada (riesgo ya listado en
   ADR-007).
 - Claves: par RSA en PEM generado por `deploy/scripts/generate-dev-certs.sh` (nuevo directorio
-  `deploy/local/certs/jwt/`, no versionado), rutas por `JWT_PRIVATE_KEY_PATH` /
+  `deploy/local/jwt/`, no versionado; fuera de `certs/` porque este se monta en todos los servicios
+  internos y la clave privada solo debe verla el Gateway), rutas por `JWT_PRIVATE_KEY_PATH` /
   `JWT_PUBLIC_KEY_PATH`, montado solo en el contenedor del Gateway.
 - Validación: `NimbusJwtDecoder.withPublicKey(...)` con validadores de `iss`, `exp`/`nbf` y
   tolerancia de reloj configurable. Se eliminan `issuer-uri` y `pendingJwtDecoder` (sustituidos por
@@ -175,11 +176,15 @@ explícitos (incluye `Authorization`, `Content-Type`, `X-Correlation-Id`), `expo
 - Servidor (asset, telemetry, incident): interceptor que construye `Actor(id, Set<Role>)` en
   `io.grpc.Context`. La capa `api` lo lee y lo pasa dentro del comando (`application` recibe un
   `Actor` value object; no conoce gRPC ni JWT).
-- Endurecimiento recomendado: el interceptor de servidor **solo acepta** metadata de identidad si
+- **Requisito (no opcional)**: el interceptor de servidor **solo acepta** metadata de identidad si
   el certificado del par mTLS corresponde a la identidad `gateway` (leer la sesión SSL del
-  transporte gRPC); de cualquier otro cliente (p. ej. simulador) se ignora. Evita que un cliente
-  interno con certificado válido se haga pasar por un usuario. **Pendiente de verificación** de la
-  API exacta para leer el certificado del par en Spring gRPC 1.0.x.
+  transporte gRPC); de cualquier otro cliente (p. ej. simulador) se ignora y la llamada se trata
+  como sin identidad. Sin esto, cualquier servicio interno con certificado válido podría
+  suplantar a un usuario con `x-actor-roles`, y la defensa en profundidad (RN-019) no se cumple.
+  **Pendiente de verificación** de la API exacta para leer el certificado del par en Spring gRPC
+  1.0.x: se resuelve al inicio del paso 2, antes de escribir el interceptor. Si la API no lo
+  permite, se detiene el paso y se propone alternativa (p. ej. un interceptor de transporte
+  propio) antes de continuar; no se degrada a "confiar en la metadata".
 - Defensa en profundidad: los casos de uso sensibles validan el rol en `application`
   (`CloseIncidentService` ya lo hace para RN-019 → migrar de string a `Role`). El Gateway sigue
   siendo la barrera principal (ADR-008).
@@ -207,22 +212,142 @@ Refresh tokens, revocación, MFA, recuperación de contraseña, proveedor de ide
 6. `grep` de logs del stack completo no encuentra contraseñas, tokens ni headers `Authorization`.
 7. El Gateway no arranca si falta la clave pública/privada configurada.
 
-## Tareas
+## Plan de entrega
 
-1. Registrar D-02 y D-03 (actualizaciones de ADR-007 y ADR-008).
-2. Proto `identity/v1` (SPEC-002) + módulo Identity en incident-service (migración, dominio,
-   casos de uso, endpoint gRPC, bootstrap).
-3. Script de claves JWT; configuración y `SecurityConfig` nuevo en Gateway (login, encoder,
-   decoder, tabla RBAC, CORS, management port).
-4. Interceptores de identidad cliente/servidor (commons si D-01).
-5. Migrar `CloseIncidentService` a `Role`.
-6. Documentar `docs/security/authn-authz.md`, `security-controls.md`, `threat-model.md` (hoy
-   vacíos) con lo implementado; actualizar `.claude/rules/security.md` (hoy dice "no
-   implementado").
+Cuatro pasos entregables por separado, cada uno con su propio commit y validación; un paso no
+empieza hasta que el anterior pasa sus criterios. Los números de criterio son los de la sección
+anterior.
+
+| Paso | Alcance | Criterios que cierra | Depende de |
+|---|---|---|---|
+| 1. Identity y login | D-02 en ADR-007; proto `identity/v1` (SPEC-002); módulo Identity en incident-service (migración, dominio, casos de uso, gRPC, bootstrap, auditoría); `POST /auth/login` en el Gateway con claves JWT (script, encoder, decoder fail-fast) | 1, 2, 7 (el 5 solo en parte, ver nota) | SPEC-002 |
+| 2. Propagación de identidad | D-03 en ADR-007/ADR-008; verificar la API de certificado del par mTLS; interceptores cliente/servidor (`x-actor-id`, `x-actor-roles`) con aceptación solo desde `gateway`; `Actor` en `application`; migrar `CloseIncidentService` a `Role` (commons si D-01) | 4 | Paso 1 |
+| 3. RBAC deny-by-default | `SecurityConfig` con la tabla rol→endpoint, CORS, puerto de management separado | 3 | Pasos 1 y 2 |
+| 4. Documentación y cierre | `docs/security/authn-authz.md`, `security-controls.md`, `threat-model.md`; actualizar `.claude/rules/security.md`; verificar el criterio 6 (logs sin secretos) con un test automatizado además de la revisión manual | 6 | Pasos 1 a 3 |
+
+Notas:
+- **Dependencia circular detectada**: el criterio 5 y la auditoría de los casos de uso de Identity
+  requieren el módulo Audit Log (`AuditRecorder`, SPEC-007), que hoy no existe y que a su vez
+  depende de SPEC-004. Propuesta pendiente de aprobación: en el paso 1, Identity depende del
+  puerto `AuditRecorder` definido en `application` y se prueba con un doble; el criterio 5 se
+  cierra cuando SPEC-007 aporte el adaptador real. Hasta entonces no se afirma que la auditoría de
+  Identity esté implementada.
+- El paso 3 va después del 2 porque las rutas protegidas dependen de que la identidad ya se
+  propague y se verifique en los servicios; así no queda un estado intermedio con RBAC en el borde
+  pero sin defensa en profundidad.
+- Los pasos 1 y 2 modifican ADR-007 (D-02 y D-03): se registran con `new-adr` en su paso, no todos
+  al inicio.
+- Si el paso 2 detiene el trabajo por la verificación del certificado, los pasos 3 y 4 no avanzan.
 
 ## Riesgos
 
+- Entregar el RBAC (paso 3) sin la aceptación restringida a `gateway` (paso 2) dejaría la
+  identidad suplantable desde cualquier servicio interno con certificado válido; por eso el orden
+  de los pasos es obligatorio.
 - El cambio de nombre de metadata (`x-actor-role` → `x-actor-roles`) rompe la compatibilidad entre
   versiones de Gateway/Incident: desplegar ambos juntos (en local siempre ocurre).
 - Usuarios demo con contraseña compartida solo son aceptables en local; documentarlo en el
   runbook.
+
+## Implementación
+
+### Paso 1 — Identity y login (parcial, 2026-10-05)
+
+Implementada la rebanada de login; el resto del paso 1 sigue pendiente.
+
+Hecho:
+- **D-02** ya estaba registrado en ADR-007 (tercera actualización); no hizo falta un ADR nuevo.
+- **Identity** (`com.coldguard.incident.identity`): migración `V5` (esquema `identity`),
+  `UserAccount` y `Role` en dominio, `VerifyCredentialsService` (una sola comparación de hash en
+  todas las rutas, bloqueo por intentos, rechazo genérico), `ProvisionUserService`, adaptador JDBC,
+  `IdentityGrpcService.VerifyCredentials` y bootstrap local (`IDENTITY_BOOTSTRAP_ENABLED`, falla el
+  arranque sin `DEMO_USERS_PASSWORD`). Un rechazo es un resultado, no una excepción, para que el
+  intento fallido se confirme en la transacción.
+- **Puerto `AuditRecorder`** en `application` (aprobado): hoy lo implementa un recorder que no
+  guarda nada y avisa con un `WARN` al arrancar. **Los cambios de Identity todavía no se auditan**;
+  el criterio 5 sigue abierto hasta que SPEC-007 aporte el adaptador real.
+- **Gateway**: `POST /api/v1/auth/login`, `JwtTokenIssuer` (RS256, claims de la sección 2),
+  `JwtDecoder` con la clave pública, issuer y tolerancia de reloj; se eliminaron `issuer-uri` y
+  `pendingJwtDecoder`. Arranque fail-fast sin claves o sin issuer.
+- **Claves**: `deploy/scripts/generate-dev-certs.sh` (también `--jwt-only`) genera el par en
+  `deploy/local/jwt/`, que solo monta el Gateway en Compose.
+
+Pendiente del paso 1:
+- RPC `CreateUser`, `GetUser`, `ListUsers`, `AssignRole`, `RevokeRole`, `SetUserEnabled` y
+  `ListUserContacts`: hoy responden `UNIMPLEMENTED`. Requieren la identidad del actor (paso 2) para
+  restringirlos a `PLATFORM_ADMIN`.
+- Validación manual con Compose de los criterios 1, 2 y 7 (hoy cubiertos por pruebas automáticas:
+  login y bloqueo contra PostgreSQL real, emisión y validación del token, arranque fail-fast).
+
+### Paso 2 — Propagación de identidad (parcial, 2026-10-05)
+
+Hecho:
+- **Verificación pendiente resuelta**: gRPC expone el certificado del par mediante
+  `Grpc.TRANSPORT_ATTR_SSL_SESSION` (grpc-api 1.77.1); un test con handshake mTLS real lo confirma.
+  No hizo falta alternativa.
+- **Gateway**: `ActorMetadataClientInterceptor` reemplaza a `ActorRoleClientInterceptor`; con
+  autenticación JWT envía `x-actor-id` (`sub`) y `x-actor-roles` (solo autoridades `ROLE_*`, sin
+  prefijo) en toda llamada gRPC; sin JWT no envía nada.
+- **Incident Service**: `ActorServerInterceptor` reemplaza a `ActorRoleServerInterceptor` y solo
+  acepta la identidad si el CN del certificado del par es `gateway`; de otro cliente con
+  certificado válido la ignora. `Actor` (`application`) viaja en `CloseIncidentCommand`, y
+  `CloseIncidentService` valida `Role.MAINTENANCE_TECHNICIAN` en lugar de un string.
+- Pruebas: unitarias del interceptor (certificado simulado), de transporte mTLS real
+  (`ActorServerInterceptorTlsTest`, acepta `gateway`, ignora otro certificado) y de cableado
+  (`PERMISSION_DENIED` con identidad de un par no confiable).
+
+Pendiente del paso 2:
+- Interceptor y `Actor` en asset-service y telemetry-service: hoy no tienen servidor gRPC.
+- `Actor.system(...)` en consumidores AMQP y tareas programadas, cuando existan casos de uso que
+  lo necesiten.
+- `Role` vive en `identity.domain` y `application` lo importa; si otro servicio necesita el enum,
+  moverlo a commons.
+
+Validación manual con Compose (2026-10-05, stack completo healthy, `DEMO_USERS_PASSWORD` pasada por
+entorno):
+- Criterio 4: cierre con token de `supervisor` → 403; sin token → 401; con `technician` → 200.
+  Llamada gRPC directa a `incident-service:9093` con `grpcurl` y el certificado de
+  `sensor-simulator`, enviando `x-actor-roles: MAINTENANCE_TECHNICIAN` → `PermissionDenied`; con el
+  certificado `gateway` la identidad se acepta y el incidente se cierra.
+- Criterio 1: login correcto para los cinco roles; contraseña errónea y usuario inexistente
+  devuelven el mismo 401.
+- Criterio 2: tras 8 intentos fallidos, la contraseña correcta devuelve 401; otro usuario sigue
+  entrando.
+- Criterio 6 (parcial, solo este recorrido): 695 líneas de logs del stack sin la contraseña demo,
+  `Bearer`, `Authorization:` ni tokens JWT. El test automatizado sigue pendiente (paso 4).
+
+### Paso 3 — RBAC deny-by-default (2026-10-05)
+
+Hecho:
+- `SecurityConfig` declara la tabla completa de la sección 3 con `anyRequest().denyAll()` al final;
+  las reglas, de la más específica a la más general, viven en un solo método.
+- `POST /incidents` (creación técnica) solo existe con
+  `coldguard.gateway.technical-endpoints.enabled=true` (`COLDGUARD_TECHNICAL_ENDPOINTS_ENABLED`),
+  cerrada por defecto; Compose local la activa.
+- CORS por `COLDGUARD_CORS_ALLOWED_ORIGINS`, métodos y cabeceras explícitos, sin credenciales; un
+  `*` impide el arranque.
+- El puerto de management (8090) ya estaba separado; `EndpointRequest` solo coincide en ese puerto.
+- `RbacPolicyTest` recorre las 33 filas de la tabla: rol permitido → ni 401 ni 403; los otros
+  roles → 403; sin token → 401; más rutas no listadas (incluido `/actuator`) → denegadas.
+- Validado en Compose: ruta desconocida 401/403, `GET /incidents` como auditor 403,
+  `POST /incidents` como `technician` 403 y como `admin` pasa la seguridad, healthchecks del
+  puerto 8090 sanos.
+
+Nota: la tabla declara rutas cuyos controladores aún no existen; para quien tiene el rol responden
+404. `POST /incidents/{id}/close` con un id que no es UUID responde 502 (error interno de
+Incident Service), independiente de la seguridad; queda por corregir.
+
+### Paso 4 — Documentación y cierre (2026-10-05)
+
+Hecho:
+- `docs/security/authn-authz.md` (tabla rol→endpoint, autenticación, propagación, CORS),
+  `security-controls.md` y `threat-model.md`. Las tres tenían solo la nota "Diferido a Sprint 3-4";
+  se completaron porque este spec lo pide en el paso 4.
+- `.claude/rules/security.md` y R-014 en `docs/quality/risk-register.md` actualizados.
+- Criterio 6: `LogSecretsTest` ejecuta login correcto y fallido y peticiones autenticadas con
+  logging de seguridad en TRACE y comprueba que ni la contraseña, ni el token, ni `Bearer eyJ…`
+  aparecen en el log; además verifica que el log se capturó.
+
+Pendiente del spec: RPC de administración de usuarios y auditoría real de Identity (criterio 5,
+SPEC-007); confirmar con el PO el alcance del Auditor y del Operador; interceptores en asset y
+telemetry cuando tengan gRPC.

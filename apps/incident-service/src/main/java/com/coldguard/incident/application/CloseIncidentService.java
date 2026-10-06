@@ -1,6 +1,7 @@
 package com.coldguard.incident.application;
 
 import com.coldguard.incident.domain.Incident;
+import com.coldguard.incident.identity.domain.Role;
 import org.springframework.stereotype.Service;
 
 /**
@@ -12,8 +13,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class CloseIncidentService {
 
-  static final String REQUIRED_ACTOR_ROLE = "ROLE_MAINTENANCE_TECHNICIAN";
-
   private final IncidentRepository incidentRepository;
 
   public CloseIncidentService(IncidentRepository incidentRepository) {
@@ -21,8 +20,9 @@ public class CloseIncidentService {
   }
 
   public Incident close(CloseIncidentCommand command) {
-    if (!REQUIRED_ACTOR_ROLE.equals(command.actorRole())) {
-      throw new IncidentCloseForbiddenException(command.actorRole());
+    Actor actor = command.actor();
+    if (actor == null || !actor.hasRole(Role.MAINTENANCE_TECHNICIAN)) {
+      throw new IncidentCloseForbiddenException(actor);
     }
     requireNonBlank(command.cause(), "cause is required");
     requireNonBlank(command.resolutionComment(), "resolutionComment is required");

@@ -29,15 +29,20 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
- * Exercises the real {@link ActorRoleClientInterceptor} (not a mock of IncidentGrpcClient) against
- * an in-process gRPC server that captures the metadata it actually receives.
+ * Exercises the real {@link ActorMetadataClientInterceptor} (not a mock of IncidentGrpcClient)
+ * against an in-process gRPC server that captures the metadata it actually receives.
  */
-class ActorRoleClientInterceptorTest {
+class ActorMetadataClientInterceptorTest {
 
-  private static final Metadata.Key<String> ACTOR_ROLE_KEY =
-      Metadata.Key.of("x-actor-role", Metadata.ASCII_STRING_MARSHALLER);
+  private static final Metadata.Key<String> ACTOR_ID_KEY =
+      Metadata.Key.of("x-actor-id", Metadata.ASCII_STRING_MARSHALLER);
+
+  private static final Metadata.Key<String> ACTOR_ROLES_KEY =
+      Metadata.Key.of("x-actor-roles", Metadata.ASCII_STRING_MARSHALLER);
 
   private Server server;
   private ManagedChannel channel;
@@ -54,35 +59,45 @@ class ActorRoleClientInterceptorTest {
   }
 
   @Test
-  void interceptCall_authoritiesIncludeFactorBearerAndRequiredRole_propagatesOnlyRequiredRole()
-      throws Exception {
-    setAuthenticatedAuthorities("FACTOR_BEARER", "ROLE_MAINTENANCE_TECHNICIAN");
-    AtomicReference<String> capturedActorRole = new AtomicReference<>();
+  void interceptCall_jwtAuthentication_propagatesSubjectAndOnlyRoleAuthorities() throws Exception {
+    setJwtAuthentication("user-1", "FACTOR_BEARER", "ROLE_OPERATIONS_SUPERVISOR", "ROLE_AUDITOR");
 
-    callCloseIncidentThroughInterceptor(capturedActorRole);
+    Metadata received = callCloseIncidentThroughInterceptor();
 
-    assertThat(capturedActorRole.get()).isEqualTo("ROLE_MAINTENANCE_TECHNICIAN");
+    assertThat(received.get(ACTOR_ID_KEY)).isEqualTo("user-1");
+    assertThat(received.get(ACTOR_ROLES_KEY)).isEqualTo("OPERATIONS_SUPERVISOR,AUDITOR");
   }
 
   @Test
-  void interceptCall_requiredRoleAbsent_sendsNoActorRoleMetadata() throws Exception {
-    setAuthenticatedAuthorities("FACTOR_BEARER", "ROLE_SUPERVISOR");
-    AtomicReference<String> capturedActorRole = new AtomicReference<>();
+  void interceptCall_nonJwtAuthentication_sendsNoIdentityMetadata() throws Exception {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new TestingAuthenticationToken(
+                "actor", "n/a", List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))));
 
-    callCloseIncidentThroughInterceptor(capturedActorRole);
+    Metadata received = callCloseIncidentThroughInterceptor();
 
-    assertThat(capturedActorRole.get()).isNull();
+    assertThat(received.get(ACTOR_ID_KEY)).isNull();
+    assertThat(received.get(ACTOR_ROLES_KEY)).isNull();
   }
 
-  private void callCloseIncidentThroughInterceptor(AtomicReference<String> capturedActorRole)
-      throws Exception {
+  @Test
+  void interceptCall_noAuthentication_sendsNoIdentityMetadata() throws Exception {
+    Metadata received = callCloseIncidentThroughInterceptor();
+
+    assertThat(received.get(ACTOR_ID_KEY)).isNull();
+    assertThat(received.get(ACTOR_ROLES_KEY)).isNull();
+  }
+
+  private Metadata callCloseIncidentThroughInterceptor() throws Exception {
+    AtomicReference<Metadata> captured = new AtomicReference<>();
     String serverName = "actor-role-client-interceptor-test-" + System.nanoTime();
     ServerInterceptor captureInterceptor =
         new ServerInterceptor() {
           @Override
           public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
               ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
-            capturedActorRole.set(headers.get(ACTOR_ROLE_KEY));
+            captured.set(headers);
             return Contexts.interceptCall(Context.current(), call, headers, next);
           }
         };
@@ -108,18 +123,19 @@ class ActorRoleClientInterceptorTest {
             .start();
     channel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
     Channel interceptedChannel =
-        ClientInterceptors.intercept(channel, new ActorRoleClientInterceptor());
+        ClientInterceptors.intercept(channel, new ActorMetadataClientInterceptor());
 
     IncidentServiceGrpc.newBlockingStub(interceptedChannel)
         .closeIncident(CloseIncidentRequest.newBuilder().setIncidentId("incident-1").build());
+    return captured.get();
   }
 
-  private static void setAuthenticatedAuthorities(String... authorities) {
-    List<GrantedAuthority> grantedAuthorities = new ArrayList<>();
+  private static void setJwtAuthentication(String subject, String... authorities) {
+    List<GrantedAuthority> granted = new ArrayList<>();
     for (String authority : authorities) {
-      grantedAuthorities.add(new SimpleGrantedAuthority(authority));
+      granted.add(new SimpleGrantedAuthority(authority));
     }
-    SecurityContextHolder.getContext()
-        .setAuthentication(new TestingAuthenticationToken("actor", "n/a", grantedAuthorities));
+    Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(subject).build();
+    SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, granted));
   }
 }

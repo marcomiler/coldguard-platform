@@ -39,7 +39,8 @@ spring:
     username: ${DB_USER:coldguard}
     password: ${DB_PASSWORD:coldguard}
   flyway:
-    schemas: incident
+    # The first schema is the default one (history table, unqualified migrations).
+    schemas: incident,identity
     create-schemas: true
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
@@ -66,6 +67,16 @@ spring:
       ddl-auto: validate
 
 coldguard:
+  identity:
+    lockout:
+      max-attempts: ${IDENTITY_LOCKOUT_MAX_ATTEMPTS:5}
+      duration: ${IDENTITY_LOCKOUT_DURATION:15m}
+    password:
+      min-length: ${IDENTITY_PASSWORD_MIN_LENGTH:8}
+    bootstrap:
+      # Local Compose only; creates one demo user per role. Needs DEMO_USERS_PASSWORD.
+      enabled: ${IDENTITY_BOOTSTRAP_ENABLED:false}
+      demo-password: ${DEMO_USERS_PASSWORD:}
   outbox:
     enabled: true
     poll-interval: 500ms

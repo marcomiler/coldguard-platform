@@ -1,16 +1,19 @@
-- Target design: JWT + Spring Security, RBAC by actor role (ADR-007). **Current state: partial.**
-  `apps/gateway` has Spring Security with a resource-server JWT converter, but only
-  `POST /api/v1/incidents/*/close` is protected and the decoder fails closed because no issuer is
-  configured; there is no login, no user store and no RBAC for the other routes. The full
-  implementation is specified in `docs/specs/SPEC-004-identidad-seguridad.md` (deny-by-default
-  RBAC table). Do not write or review code as if edge JWT validation already covers the API.
-- The Gateway is the sole component that validates the JWT at the edge (ADR-008). The propagation
-  mechanism is **decided** (ADR-007, third update): the Gateway sends `x-actor-id` and
-  `x-actor-roles` as gRPC metadata over mTLS, and internal services accept it only from the
-  `gateway` client identity (target design; today only the interim `x-actor-role` metadata for
-  the close endpoint exists). Internal services must never parse or trust a raw `Authorization`
-  header themselves — that
-  re-implements edge auth regardless of which mechanism is eventually picked.
+- Target design: JWT + Spring Security, RBAC by actor role (ADR-007). **Current state: Gateway
+  implemented, user administration pending.** `apps/gateway` issues RS256 JWTs at
+  `POST /api/v1/auth/login` (credentials verified by Identity & Access in `incident-service` over
+  gRPC/mTLS), validates them at the edge, and applies deny-by-default RBAC: every route is declared
+  in `SecurityConfig`, anything else is rejected. The role→endpoint table lives in
+  `docs/security/authn-authz.md`; `RbacPolicyTest` walks it, so change both together. Still
+  pending: the user-administration RPCs (`CreateUser`, `AssignRole`, …, `UNIMPLEMENTED`) and the
+  audit of identity changes (`AuditRecorder` persists nothing until SPEC-007). Most RBAC routes are
+  declared but their controllers do not exist yet; do not write or review code as if they did.
+- The Gateway is the sole component that validates the JWT at the edge (ADR-008). Propagation is
+  **implemented** (ADR-007, third update): the Gateway sends `x-actor-id` and `x-actor-roles` as
+  gRPC metadata over mTLS, and `incident-service` (`ActorServerInterceptor`) accepts it only when
+  the peer certificate CN is `gateway`; from any other client it is ignored. Services without a
+  gRPC server (asset, telemetry) must reuse that interceptor when they get one. Internal services
+  must never parse or trust a raw `Authorization` header themselves — that re-implements edge auth
+  regardless of which mechanism is eventually picked.
 - Never log secrets, tokens, or credentials — in code, telemetry, traces, or business events
   (RNF-008).
 - Every relevant state transition (RN-008) must be auditable, including who performed it.
