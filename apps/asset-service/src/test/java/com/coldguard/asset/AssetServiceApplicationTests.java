@@ -17,7 +17,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
 @Testcontainers
-@SpringBootTest
+@SpringBootTest(properties = "spring.grpc.server.port=0")
 class AssetServiceApplicationTests {
 
   @Container static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine");

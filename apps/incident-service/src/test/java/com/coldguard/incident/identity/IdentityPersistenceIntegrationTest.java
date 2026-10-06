@@ -3,13 +3,13 @@ package com.coldguard.incident.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.coldguard.commons.security.Role;
 import com.coldguard.incident.identity.application.AuthenticationResult;
 import com.coldguard.incident.identity.application.ProvisionUserCommand;
 import com.coldguard.incident.identity.application.ProvisionUserService;
 import com.coldguard.incident.identity.application.UserAccountRepository;
 import com.coldguard.incident.identity.application.UserAlreadyExistsException;
 import com.coldguard.incident.identity.application.VerifyCredentialsService;
-import com.coldguard.incident.identity.domain.Role;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -125,8 +125,8 @@ class IdentityPersistenceIntegrationTest {
 
   @Autowired com.coldguard.incident.identity.application.UserAdministrationService administration;
 
-  private static final com.coldguard.incident.identity.domain.Actor ADMIN_ACTOR =
-      new com.coldguard.incident.identity.domain.Actor("admin-test", Set.of(Role.PLATFORM_ADMIN));
+  private static final com.coldguard.commons.security.Actor ADMIN_ACTOR =
+      new com.coldguard.commons.security.Actor("admin-test", Set.of(Role.PLATFORM_ADMIN));
 
   private com.coldguard.incident.identity.domain.UserAccount newUser(String username) {
     return administration.create(

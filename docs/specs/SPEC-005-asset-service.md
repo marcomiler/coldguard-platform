@@ -240,3 +240,68 @@ Derivados de `docs/quality/acceptance-criteria.md` (RF-016) y HU-019/HU-020:
 - Guards de la máquina de estados no triviales (riesgo ya señalado en `sprint-3.md`): cubrirlos
   explícitamente en el spec de pruebas final.
 - `NUMERIC(6,2)` asume temperaturas en rango ±9999.99; ajustar si se usan otras magnitudes.
+
+## Implementación
+
+### Entrega 1 — Esquema, gRPC con identidad y datos maestros (2026-10-05)
+
+Hecho:
+- **Esquema** (`V3__create_asset_tables.sql`; `V1` y `V2` ya eran las tablas de mensajería, no
+  `V1` como dice el spec): todas las tablas de la sección "Modelo y persistencia", con los `CHECK`
+  del perfil y los índices únicos sin distinguir mayúsculas.
+- **Dominio**: `Organization`, `Site`, `Asset`, `Sensor`, `OperationalProfile` (invariantes
+  idénticas a los `CHECK`, `NUMERIC(6,2)` con rechazo de valores fuera de rango),
+  `CalibrationRecord` y las excepciones con código de negocio estable.
+- **Casos de uso**: `AssetCatalogService` (organización, sede, activo, `AssetRegistered`,
+  `AssetUpdated`), `SensorService` (alta con asignación inicial, calibración inicial opcional y
+  perfil opcional; datos técnicos; consultas) y `OperationalProfileService`
+  (`OperationalProfileUpdated`). Los comandos exigen `PLATFORM_ADMIN` y las consultas también
+  `OPERATIONS_SUPERVISOR`, comprobado en `application`.
+- **gRPC**: 14 de los 22 RPC de `AssetService`, con `AssetGrpcExceptionHandler` y el trailer
+  `x-error-code`; el resto responde `UNIMPLEMENTED` hasta las entregas 2 y 3. Servidor con mTLS en
+  el puerto 9091; la identidad se acepta solo del certificado `gateway`.
+- **Compose**: asset-service monta los certificados, publica gRPC solo dentro de la red y recibe
+  `ASSET_CALIBRATION_DEFAULT_VALIDITY` (`P90D`, placeholder académico de DEC-022).
+- `Actor`, `Role` y `ActorServerInterceptor` pasaron a `coldguard-commons`
+  (`com.coldguard.commons.security`) para compartirlos con Asset sin duplicar la comprobación del
+  certificado; Incident los importa de ahí.
+
+Decisiones tomadas en la implementación:
+- **JDBC en lugar de JPA** para los repositorios (`JdbcClient`), como el módulo Identity: el
+  bloqueo optimista es explícito (`UPDATE ... WHERE id = ? AND version = ?`) y no hay entidades
+  que mapear. El spec nombra "adaptador JPA"; el puerto no cambia si se prefiere JPA después.
+- **Versiones desde 1** en todos los agregados: `version = 0` queda para "aún no existe" (así lo
+  pide el contrato del perfil, "0 al crear") y `OperationalProfileUpdated.profileVersion` exige
+  ser al menos 1.
+- **Códigos de negocio nuevos** (documentados en `contracts/grpc/README.md`):
+  `ORGANIZATION_NOT_FOUND`, `PROFILE_NOT_FOUND`, `ORGANIZATION_NAME_DUPLICATED`,
+  `SITE_NAME_DUPLICATED`.
+- Un id que no es UUID se trata como no encontrado, no como argumento inválido: no puede existir.
+- Una actualización que no cambia nada (activo, sensor o perfil idéntico) no escribe ni publica.
+- La calibración inicial deja dos entradas de historial (`REGISTERED` y `CALIBRATION_RECORDED`).
+
+Verificación: 74 tests en asset-service (dominio, casos de uso con almacén en memoria, cableado
+gRPC, manejador de errores, e integración contra PostgreSQL y RabbitMQ reales: migración,
+unicidad, bloqueo optimista, rollback de un alta fallida, contenido del outbox y `CHECK` del
+perfil). Los eventos se comprueban contra `contracts/events/asset` (constantes del envelope,
+campos obligatorios, tipos y enums). En Compose: alta de organización, sede, activo y sensor con
+calibración y perfil por gRPC con el certificado `gateway`; el certificado del simulador con
+identidad de administrador recibe `PermissionDenied`; sin certificado el handshake falla; serial
+duplicado → `AlreadyExists` con `SENSOR_SERIAL_DUPLICATED`; caducidad de la calibración =
+`performed_at` + 90 días.
+
+Hallazgo fuera de Asset: los eventos quedan en el outbox y se reintentan con
+`UnroutableMessageException` mientras ninguna cola esté enlazada. La cola `incident-service.audit`
+(que recibe `asset.*`) se declara con `Declarables`, y Spring AMQP solo la crea cuando el servicio
+abre una conexión; Incident aún no tiene consumidores (SPEC-007), así que nadie la declara. Con
+una cola enlazada a mano los tres eventos se publican en orden y con su `aggregateVersion`. Debe
+resolverse con los consumidores de SPEC-007; hasta entonces los eventos de Asset se reintentan y,
+tras `max-attempts`, quedan aparcados.
+
+Pendiente:
+- Entrega 2: máquina de estados del sensor, `ChangeSensorStatus`, `RecordCalibration`,
+  `ReassignSensor`, `RetireSensor`, `GetSensorHistory` y `GetSensorEvaluationContext(s)`.
+- Entrega 3: tarea programada de vencimiento de calibración.
+- Entrega 4: rutas del Gateway (canal gRPC `asset-service`), y actualizar `component-diagram.md`.
+- Los tests de arranque dependen de los certificados de desarrollo locales
+  (`deploy/scripts/generate-dev-certs.sh`), igual que los de incident-service.

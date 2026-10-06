@@ -1,6 +1,9 @@
 package com.coldguard.incident.identity.api;
 
 import com.coldguard.common.grpc.v1.PageInfo;
+import com.coldguard.commons.security.Actor;
+import com.coldguard.commons.security.ActorServerInterceptor;
+import com.coldguard.commons.security.Role;
 import com.coldguard.identity.grpc.v1.AssignRoleRequest;
 import com.coldguard.identity.grpc.v1.AuthenticatedUser;
 import com.coldguard.identity.grpc.v1.CreateUserRequest;
@@ -23,8 +26,6 @@ import com.coldguard.incident.identity.application.UserAdministrationService;
 import com.coldguard.incident.identity.application.UserAlreadyExistsException;
 import com.coldguard.incident.identity.application.UserNotFoundException;
 import com.coldguard.incident.identity.application.VerifyCredentialsService;
-import com.coldguard.incident.identity.domain.Actor;
-import com.coldguard.incident.identity.domain.Role;
 import com.coldguard.incident.identity.domain.UserAccount;
 import com.google.protobuf.Timestamp;
 import io.grpc.Status;

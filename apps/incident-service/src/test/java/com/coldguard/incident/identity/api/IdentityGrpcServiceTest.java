@@ -3,6 +3,8 @@ package com.coldguard.incident.identity.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.coldguard.commons.security.Actor;
+import com.coldguard.commons.security.ActorServerInterceptor;
 import com.coldguard.identity.grpc.v1.AssignRoleRequest;
 import com.coldguard.identity.grpc.v1.AuthenticatedUser;
 import com.coldguard.identity.grpc.v1.CreateUserRequest;
@@ -17,7 +19,6 @@ import com.coldguard.incident.identity.application.LastAdministratorException;
 import com.coldguard.incident.identity.application.UserAdministrationService;
 import com.coldguard.incident.identity.application.UserNotFoundException;
 import com.coldguard.incident.identity.application.VerifyCredentialsService;
-import com.coldguard.incident.identity.domain.Actor;
 import com.coldguard.incident.identity.domain.UserAccount;
 import io.grpc.Context;
 import io.grpc.Contexts;
@@ -87,8 +88,8 @@ class IdentityGrpcServiceTest {
                     "marta",
                     "Marta",
                     Set.of(
-                        com.coldguard.incident.identity.domain.Role.AUDITOR,
-                        com.coldguard.incident.identity.domain.Role.OPERATOR))));
+                        com.coldguard.commons.security.Role.AUDITOR,
+                        com.coldguard.commons.security.Role.OPERATOR))));
 
     AuthenticatedUser user = stub.verifyCredentials(request());
 
@@ -123,7 +124,7 @@ class IdentityGrpcServiceTest {
   }
 
   private static final Actor ADMIN =
-      new Actor("admin-1", Set.of(com.coldguard.incident.identity.domain.Role.PLATFORM_ADMIN));
+      new Actor("admin-1", Set.of(com.coldguard.commons.security.Role.PLATFORM_ADMIN));
 
   private static UserAccount account() {
     return UserAccount.register(
@@ -132,8 +133,8 @@ class IdentityGrpcServiceTest {
         "Marta",
         "{bcrypt}x",
         Set.of(
-            com.coldguard.incident.identity.domain.Role.AUDITOR,
-            com.coldguard.incident.identity.domain.Role.OPERATOR),
+            com.coldguard.commons.security.Role.AUDITOR,
+            com.coldguard.commons.security.Role.OPERATOR),
         Instant.parse("2026-10-05T12:00:00Z"));
   }
 
@@ -145,7 +146,7 @@ class IdentityGrpcServiceTest {
             administration.assignRole(
                 ADMIN,
                 account.id().toString(),
-                com.coldguard.incident.identity.domain.Role.OPERATOR,
+                com.coldguard.commons.security.Role.OPERATOR,
                 "cover"))
         .thenReturn(account);
 

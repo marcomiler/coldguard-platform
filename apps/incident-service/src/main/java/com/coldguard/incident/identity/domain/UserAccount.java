@@ -1,5 +1,6 @@
 package com.coldguard.incident.identity.domain;
 
+import com.coldguard.commons.security.Role;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumSet;

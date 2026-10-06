@@ -3,8 +3,8 @@ package com.coldguard.incident.identity.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.coldguard.incident.identity.domain.Actor;
-import com.coldguard.incident.identity.domain.Role;
+import com.coldguard.commons.security.Actor;
+import com.coldguard.commons.security.Role;
 import com.coldguard.incident.identity.domain.UserAccount;
 import java.time.Clock;
 import java.time.Instant;

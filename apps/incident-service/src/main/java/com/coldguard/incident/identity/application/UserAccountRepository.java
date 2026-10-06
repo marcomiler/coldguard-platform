@@ -1,6 +1,6 @@
 package com.coldguard.incident.identity.application;
 
-import com.coldguard.incident.identity.domain.Role;
+import com.coldguard.commons.security.Role;
 import com.coldguard.incident.identity.domain.UserAccount;
 import java.util.List;
 import java.util.Optional;

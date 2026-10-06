@@ -1,9 +1,9 @@
 package com.coldguard.incident.identity.infrastructure;
 
+import com.coldguard.commons.security.Role;
 import com.coldguard.incident.identity.application.ProvisionUserCommand;
 import com.coldguard.incident.identity.application.ProvisionUserService;
 import com.coldguard.incident.identity.application.UserAccountRepository;
-import com.coldguard.incident.identity.domain.Role;
 import com.coldguard.incident.identity.domain.UserAccount;
 import java.util.Set;
 import org.slf4j.Logger;
