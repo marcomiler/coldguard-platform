@@ -273,9 +273,8 @@ Hecho:
   `deploy/local/jwt/`, que solo monta el Gateway en Compose.
 
 Pendiente del paso 1:
-- RPC `CreateUser`, `GetUser`, `ListUsers`, `AssignRole`, `RevokeRole`, `SetUserEnabled` y
-  `ListUserContacts`: hoy responden `UNIMPLEMENTED`. Requieren la identidad del actor (paso 2) para
-  restringirlos a `PLATFORM_ADMIN`.
+- ~~RPC `CreateUser`, `GetUser`, `ListUsers`, `AssignRole`, `RevokeRole`, `SetUserEnabled` y
+  `ListUserContacts`~~: implementados después, ver "Administración de usuarios".
 - Validación manual con Compose de los criterios 1, 2 y 7 (hoy cubiertos por pruebas automáticas:
   login y bloqueo contra PostgreSQL real, emisión y validación del token, arranque fail-fast).
 
@@ -334,8 +333,10 @@ Hecho:
   puerto 8090 sanos.
 
 Nota: la tabla declara rutas cuyos controladores aún no existen; para quien tiene el rol responden
-404. `POST /incidents/{id}/close` con un id que no es UUID responde 502 (error interno de
-Incident Service), independiente de la seguridad; queda por corregir.
+404. `POST /incidents/{id}/close` con un id que no es UUID respondía 502 (error interno de
+Incident Service), independiente de la seguridad; corregido: un id que no es UUID no puede existir
+y responde 404 (`IncidentRepositoryAdapter.findById`, `IncidentRepositoryAdapterIdTest`, validado
+en Compose).
 
 ### Paso 4 — Documentación y cierre (2026-10-05)
 
@@ -351,3 +352,41 @@ Hecho:
 Pendiente del spec: RPC de administración de usuarios y auditoría real de Identity (criterio 5,
 SPEC-007); confirmar con el PO el alcance del Auditor y del Operador; interceptores en asset y
 telemetry cuando tengan gRPC.
+
+### Administración de usuarios (2026-10-05)
+
+Cierra lo que quedaba del paso 1, ahora que el actor llega a Identity.
+
+Hecho:
+- `UserAdministrationService` (Identity): `create`, `get`, `list`, `assignRole`, `revokeRole`,
+  `setEnabled` y `listContacts`. Todas exigen `PLATFORM_ADMIN` en `application`, no solo en el
+  Gateway. Los cambios de rol y de habilitación exigen motivo y generan un `AuditEntry` con actor,
+  motivo y valores anterior y posterior, sin hash ni contraseña, en la misma transacción.
+- Repetir una asignación, una revocación de un rol que no se tiene o un cambio de habilitación
+  que no cambia nada devuelve el usuario sin escribir ni auditar.
+- El último `PLATFORM_ADMIN` habilitado no puede perder el rol ni ser deshabilitado. Es más estricto
+  que el spec, que solo habla de que un administrador no se revoque a sí mismo: aquí aplica a
+  cualquier actor, porque el efecto (sistema sin administradores) es el mismo. La consulta de otros
+  administradores bloquea esas filas (`FOR UPDATE`) para que dos cambios concurrentes no se anulen
+  entre sí.
+- Los siete RPC de `IdentityService` están implementados y traducen los errores a códigos gRPC
+  (`PERMISSION_DENIED`, `NOT_FOUND`, `ALREADY_EXISTS`, `FAILED_PRECONDITION`, `INVALID_ARGUMENT`);
+  un error inesperado es `INTERNAL` sin detalle.
+- Gateway: `GET /users`, `GET /users/{id}`, `POST /users`, `POST` y `DELETE /users/{id}/roles`,
+  `POST /users/{id}/enabled`, con Problem Details y sin devolver contraseñas.
+- Reorganización: `Actor` y `ActorServerInterceptor` pasaron a `identity.domain` e `identity.api`,
+  junto a `Role`, para que Identity no dependa del módulo de incidentes.
+- Validado en Compose: crear, duplicado (409), contraseña corta (400), asignar sin motivo (400),
+  asignar, rol inválido (400), revocar, deshabilitar (el usuario ya no entra), quitar el rol al
+  único administrador (409), deshabilitarlo (409), usuario inexistente (404), supervisor →
+  `GET /users` 403; los logs del stack no contienen contraseñas ni tokens.
+
+Decisiones tomadas sin consultar:
+- Un usuario puede quedarse sin roles (no podrá autenticarse); el spec solo exige un rol para
+  poder autenticarse, no impide revocar el último.
+- `ListUserContacts` exige `PLATFORM_ADMIN` por ahora; cuando D-10 lo consuma habrá que decidir
+  cómo se identifica un llamador de sistema.
+- El campo `version` de `User` en el contrato no se rellena (el dominio no la expone).
+
+Sigue pendiente: persistir la auditoría (criterio 5, SPEC-007), confirmar con el PO el alcance de
+Auditor y Operador, e instalar el interceptor en asset y telemetry cuando tengan gRPC.

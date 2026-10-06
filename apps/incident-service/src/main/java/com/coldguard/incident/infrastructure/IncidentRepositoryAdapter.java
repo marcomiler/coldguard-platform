@@ -49,7 +49,14 @@ public class IncidentRepositoryAdapter implements IncidentRepository {
 
   @Override
   public Optional<Incident> findById(String incidentId) {
-    return jpaRepository.findById(UUID.fromString(incidentId)).map(this::toDomain);
+    UUID id;
+    try {
+      id = UUID.fromString(incidentId);
+    } catch (IllegalArgumentException notAnId) {
+      // Every stored id is a UUID, so anything else cannot exist; it is not a server error.
+      return Optional.empty();
+    }
+    return jpaRepository.findById(id).map(this::toDomain);
   }
 
   @Override

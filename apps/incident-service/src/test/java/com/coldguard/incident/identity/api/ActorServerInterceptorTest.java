@@ -1,4 +1,4 @@
-package com.coldguard.incident.api;
+package com.coldguard.incident.identity.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

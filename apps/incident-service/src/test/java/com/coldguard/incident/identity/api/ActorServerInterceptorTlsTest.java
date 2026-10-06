@@ -1,11 +1,11 @@
-package com.coldguard.incident.api;
+package com.coldguard.incident.identity.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coldguard.incident.application.Actor;
 import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
 import com.coldguard.incident.grpc.v1.CloseIncidentResponse;
 import com.coldguard.incident.grpc.v1.IncidentServiceGrpc;
+import com.coldguard.incident.identity.domain.Actor;
 import com.coldguard.incident.identity.domain.Role;
 import com.coldguard.incident.testsupport.EphemeralCertificateAuthority;
 import com.coldguard.incident.testsupport.EphemeralCertificateAuthority.IssuedCertificate;

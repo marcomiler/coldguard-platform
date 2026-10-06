@@ -122,4 +122,72 @@ class IdentityPersistenceIntegrationTest {
     assertThatThrownBy(() -> provisioning.provision(sameEmail))
         .isInstanceOf(UserAlreadyExistsException.class);
   }
+
+  @Autowired com.coldguard.incident.identity.application.UserAdministrationService administration;
+
+  private static final com.coldguard.incident.identity.domain.Actor ADMIN_ACTOR =
+      new com.coldguard.incident.identity.domain.Actor("admin-test", Set.of(Role.PLATFORM_ADMIN));
+
+  private com.coldguard.incident.identity.domain.UserAccount newUser(String username) {
+    return administration.create(
+        ADMIN_ACTOR,
+        new ProvisionUserCommand(
+            username,
+            username + "@example.com",
+            username,
+            "long-enough-pw",
+            Set.of(Role.AUDITOR),
+            null));
+  }
+
+  @Test
+  void roleChangesArePersistedWithTheActorThatMadeThem() {
+    var user = newUser("roles-user");
+    String id = user.id().toString();
+
+    administration.assignRole(ADMIN_ACTOR, id, Role.OPERATOR, "covers shifts");
+    assertThat(users.findById(user.id()).orElseThrow().roles())
+        .containsExactlyInAnyOrder(Role.AUDITOR, Role.OPERATOR);
+    assertThat(
+            jdbc.sql(
+                    "SELECT assigned_by FROM identity.user_role WHERE user_id = ? AND role = 'OPERATOR'")
+                .param(user.id())
+                .query(String.class)
+                .single())
+        .isEqualTo("admin-test");
+
+    administration.revokeRole(ADMIN_ACTOR, id, Role.AUDITOR, "moved");
+    assertThat(users.findById(user.id()).orElseThrow().roles()).containsExactly(Role.OPERATOR);
+  }
+
+  @Test
+  void aDisabledUserCannotLogIn() {
+    var user = newUser("disabled-user");
+    assertThat(verify.verify("disabled-user", "long-enough-pw"))
+        .isInstanceOf(AuthenticationResult.Authenticated.class);
+
+    administration.setEnabled(ADMIN_ACTOR, user.id().toString(), false, "left");
+
+    assertThat(verify.verify("disabled-user", "long-enough-pw"))
+        .isInstanceOf(AuthenticationResult.Rejected.class);
+    assertThat(users.findEnabledByRole(Role.AUDITOR))
+        .extracting(com.coldguard.incident.identity.domain.UserAccount::username)
+        .doesNotContain("disabled-user");
+  }
+
+  @Test
+  void administratorsAreCountedExcludingTheTargetAndPagingIsOrdered() {
+    var admin = newUser("second-admin");
+    administration.assignRole(
+        ADMIN_ACTOR, admin.id().toString(), Role.PLATFORM_ADMIN, "second administrator");
+
+    assertThat(users.countOtherEnabledWithRoleForUpdate(Role.PLATFORM_ADMIN, admin.id()))
+        .isGreaterThanOrEqualTo(1);
+    assertThat(users.findPage(0, 3))
+        .hasSize(3)
+        .isSortedAccordingTo(
+            java.util.Comparator.comparing(
+                com.coldguard.incident.identity.domain.UserAccount::username));
+    assertThat(users.count()).isGreaterThanOrEqualTo(Role.values().length + 1);
+  }
 }

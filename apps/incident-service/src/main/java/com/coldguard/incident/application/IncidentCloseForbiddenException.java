@@ -1,5 +1,7 @@
 package com.coldguard.incident.application;
 
+import com.coldguard.incident.identity.domain.Actor;
+
 /** Thrown when a close is requested by an actor without the authority required by RN-019. */
 public class IncidentCloseForbiddenException extends RuntimeException {
 

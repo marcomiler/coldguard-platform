@@ -16,6 +16,7 @@ import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.Criticality;
 import com.coldguard.incident.grpc.v1.IncidentServiceGrpc;
 import com.coldguard.incident.grpc.v1.Magnitude;
+import com.coldguard.incident.identity.api.ActorServerInterceptor;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
