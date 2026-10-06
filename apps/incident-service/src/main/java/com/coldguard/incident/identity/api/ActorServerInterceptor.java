@@ -1,6 +1,6 @@
-package com.coldguard.incident.api;
+package com.coldguard.incident.identity.api;
 
-import com.coldguard.incident.application.Actor;
+import com.coldguard.incident.identity.domain.Actor;
 import com.coldguard.incident.identity.domain.Role;
 import io.grpc.Attributes;
 import io.grpc.Context;
@@ -37,13 +37,13 @@ import org.springframework.stereotype.Component;
 @GlobalServerInterceptor
 public class ActorServerInterceptor implements ServerInterceptor {
 
-  static final Metadata.Key<String> ACTOR_ID_KEY =
+  public static final Metadata.Key<String> ACTOR_ID_KEY =
       Metadata.Key.of("x-actor-id", Metadata.ASCII_STRING_MARSHALLER);
 
-  static final Metadata.Key<String> ACTOR_ROLES_KEY =
+  public static final Metadata.Key<String> ACTOR_ROLES_KEY =
       Metadata.Key.of("x-actor-roles", Metadata.ASCII_STRING_MARSHALLER);
 
-  static final Context.Key<Actor> ACTOR_CONTEXT_KEY = Context.key("actor");
+  public static final Context.Key<Actor> ACTOR_CONTEXT_KEY = Context.key("actor");
 
   static final String GATEWAY_IDENTITY = "gateway";
 
@@ -54,7 +54,7 @@ public class ActorServerInterceptor implements ServerInterceptor {
     this(ActorServerInterceptor::isGatewayPeer);
   }
 
-  ActorServerInterceptor(Predicate<Attributes> trustedPeer) {
+  public ActorServerInterceptor(Predicate<Attributes> trustedPeer) {
     this.trustedPeer = trustedPeer;
   }
 

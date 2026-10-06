@@ -12,6 +12,7 @@ import com.coldguard.incident.domain.IncidentAlreadyClosedException;
 import com.coldguard.incident.domain.IncidentStatus;
 import com.coldguard.incident.domain.Priority;
 import com.coldguard.incident.domain.Urgency;
+import com.coldguard.incident.identity.domain.Actor;
 import com.coldguard.incident.identity.domain.Role;
 import java.time.Instant;
 import java.util.Optional;

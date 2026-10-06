@@ -18,8 +18,9 @@ existe código y pruebas; lo previsto pero ausente figura como pendiente.
 | Sin secretos, tokens ni contraseñas en logs | Implementado para login y peticiones autenticadas | `LogSecretsTest`; revisión manual del stack en Compose (SPEC-004) |
 | Actuator fuera del puerto público | Implementado | `management.server.port`; `RbacPolicyTest` |
 | CORS con orígenes explícitos | Implementado | `SecurityConfig`; `RbacPolicyTest` |
-| Auditoría de cambios de identidad (RN-008) | **Pendiente** | `AuditRecorder` no persiste nada hasta SPEC-007; el servicio lo avisa con un `WARN` al arrancar |
-| Administración de usuarios y roles | **Pendiente** | Los RPC `CreateUser`, `AssignRole`, etc. responden `UNIMPLEMENTED` |
+| Auditoría de cambios de identidad (RN-008) | **Pendiente** | Los cambios ya generan su `AuditEntry` (actor, motivo, valor anterior y posterior) en la misma transacción, pero `AuditRecorder` no persiste nada hasta SPEC-007; el servicio lo avisa con un `WARN` al arrancar |
+| Administración de usuarios y roles solo para `PLATFORM_ADMIN` | Implementado | `UserAdministrationService` (rol exigido también en Identity), `UserController`; `UserAdministrationServiceTest`, `IdentityPersistenceIntegrationTest`, `UserControllerTest` |
+| El último administrador habilitado no se puede degradar ni deshabilitar | Implementado | `UserAdministrationService`, con bloqueo de filas en `JdbcUserAccountRepository` |
 | Revocación de tokens antes de expirar | No implementado (limitación aceptada del MVP) | ADR-007 |
 | Refresh tokens, MFA, recuperación de contraseña | Fuera de alcance | SPEC-004 |
 | Limitador de tasa en el Gateway | No implementado (mejora futura) | El bloqueo por intentos vive en Identity |

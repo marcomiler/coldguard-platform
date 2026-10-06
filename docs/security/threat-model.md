@@ -33,8 +33,8 @@ informal por superficie de ataque; no es un análisis STRIDE exhaustivo.
 | Abuso de CORS desde otro origen | Lista explícita, sin `*` y sin credenciales | Depende de configurar bien la variable de entorno |
 | Acceder a Actuator desde fuera | Puerto de management separado y no publicado | En Compose, otros contenedores sí lo alcanzan |
 | Crear incidentes por el endpoint técnico | Cerrado por defecto; abierto solo con la bandera y solo `PLATFORM_ADMIN` | La bandera está activa en Compose local |
-| Un administrador se bloquea a sí mismo o al sistema | Regla prevista: no revocar el último `PLATFORM_ADMIN` | Pendiente: los RPC de administración no están implementados |
-| Cambios de identidad sin traza | Previsto: auditoría en la misma transacción | **Abierto** hasta SPEC-007 (hoy el recorder no guarda nada) |
+| Un administrador deja al sistema sin administradores | El último `PLATFORM_ADMIN` habilitado no puede perder el rol ni ser deshabilitado; la comprobación bloquea filas frente a cambios concurrentes | Una cuenta de administrador comprometida sí puede degradar a los demás |
+| Cambios de identidad sin traza | Cada cambio genera su `AuditEntry` en la misma transacción | **Abierto** hasta SPEC-007: hoy el recorder no guarda nada |
 
 ## Supuestos
 

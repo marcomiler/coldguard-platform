@@ -2,6 +2,7 @@ package com.coldguard.incident.identity.domain;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -96,6 +97,50 @@ public record UserAccount(
   public UserAccount registerSuccessfulLogin(Instant now) {
     return new UserAccount(
         id, username, email, displayName, passwordHash, enabled, 0, null, roles, createdAt, now);
+  }
+
+  public UserAccount withRole(Role role, Instant now) {
+    Set<Role> updated = EnumSet.noneOf(Role.class);
+    updated.addAll(roles);
+    updated.add(role);
+    return withRoles(updated, now);
+  }
+
+  public UserAccount withoutRole(Role role, Instant now) {
+    Set<Role> updated = EnumSet.noneOf(Role.class);
+    updated.addAll(roles);
+    updated.remove(role);
+    return withRoles(updated, now);
+  }
+
+  public UserAccount withEnabled(boolean value, Instant now) {
+    return new UserAccount(
+        id,
+        username,
+        email,
+        displayName,
+        passwordHash,
+        value,
+        failedAttempts,
+        lockedUntil,
+        roles,
+        createdAt,
+        now);
+  }
+
+  private UserAccount withRoles(Set<Role> updated, Instant now) {
+    return new UserAccount(
+        id,
+        username,
+        email,
+        displayName,
+        passwordHash,
+        enabled,
+        failedAttempts,
+        lockedUntil,
+        updated,
+        createdAt,
+        now);
   }
 
   private static String requireNonBlank(String value, String field) {

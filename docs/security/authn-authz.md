@@ -51,9 +51,29 @@ Notas:
 - El Operador solo lee incidentes: CU-004/CU-006 mencionan que "aporta contexto", pero no existe
   comando, RF ni evento para ello. Un comando del Operador requiere antes un RF/CU nuevo.
 - El Auditor lee solo la bitácora. **Pendiente de confirmar con el PO.**
-- Hoy el Gateway solo implementa `POST /auth/login` y los endpoints de incidentes (creación y
-  cierre); el resto de las filas están declaradas en la política pero la ruta aún no existe y
-  responde `404` a quien tenga el rol.
+- Hoy el Gateway implementa `POST /auth/login`, los endpoints de incidentes (creación y cierre) y
+  la administración de usuarios (`/users`); el resto de las filas están declaradas en la política
+  pero la ruta aún no existe y responde `404` a quien tenga el rol.
+
+## Administración de usuarios (`/users`)
+
+| Operación | Ruta | Reglas |
+|---|---|---|
+| Listar (paginado, `page` y `size`, máximo 100) | `GET /users` | Ordenado por usuario |
+| Consultar | `GET /users/{id}` | `404` si el id no existe o no es un UUID |
+| Crear | `POST /users` | Contraseña inicial con la política mínima de longitud; usuario o correo repetido → `409` |
+| Asignar rol | `POST /users/{id}/roles` `{ role, reason }` | Motivo obligatorio; repetir una asignación no cambia nada ni audita |
+| Revocar rol | `DELETE /users/{id}/roles` `{ role, reason }` | Motivo obligatorio |
+| Habilitar o deshabilitar | `POST /users/{id}/enabled` `{ enabled, reason }` | Motivo obligatorio |
+
+- El rol `PLATFORM_ADMIN` se exige dos veces: en el Gateway (tabla de arriba) y en Identity a
+  partir del actor propagado, que rechaza con `PERMISSION_DENIED` cualquier otra llamada.
+- El último administrador habilitado no puede perder el rol `PLATFORM_ADMIN` ni ser deshabilitado
+  (`409`, `USER_STATE_CONFLICT`). La comprobación bloquea las filas de los demás administradores
+  para que dos cambios concurrentes no puedan dejar el sistema sin ninguno.
+- Las respuestas nunca incluyen contraseña ni hash, y los errores no repiten el cuerpo recibido.
+- `ListUserContacts` existe solo para uso interno (D-10) y por ahora también exige
+  `PLATFORM_ADMIN`; el Gateway no lo expone.
 
 ## Propagación de identidad hacia los servicios internos
 

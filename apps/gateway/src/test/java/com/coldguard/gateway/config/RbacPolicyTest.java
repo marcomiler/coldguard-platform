@@ -117,6 +117,14 @@ class RbacPolicyTest {
         .isEqualTo(401);
   }
 
+  @org.junit.jupiter.api.BeforeEach
+  void stubUserListing() {
+    given(
+            identityGrpcClient.listUsers(
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+        .willReturn(new IdentityGrpcClient.UserPage(List.of(), 0, 20, 0, 0));
+  }
+
   private int statusFor(HttpMethod method, String path, Role role) throws Exception {
     return mockMvc
         .perform(

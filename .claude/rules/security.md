@@ -3,9 +3,10 @@
   `POST /api/v1/auth/login` (credentials verified by Identity & Access in `incident-service` over
   gRPC/mTLS), validates them at the edge, and applies deny-by-default RBAC: every route is declared
   in `SecurityConfig`, anything else is rejected. The role→endpoint table lives in
-  `docs/security/authn-authz.md`; `RbacPolicyTest` walks it, so change both together. Still
-  pending: the user-administration RPCs (`CreateUser`, `AssignRole`, …, `UNIMPLEMENTED`) and the
-  audit of identity changes (`AuditRecorder` persists nothing until SPEC-007). Most RBAC routes are
+  `docs/security/authn-authz.md`; `RbacPolicyTest` walks it, so change both together. User
+  administration (`/users`) is implemented and requires `PLATFORM_ADMIN` both at the Gateway and
+  in Identity. Still pending: persisting the audit of identity changes (`AuditRecorder` keeps
+  nothing until SPEC-007). Most RBAC routes are
   declared but their controllers do not exist yet; do not write or review code as if they did.
 - The Gateway is the sole component that validates the JWT at the edge (ADR-008). Propagation is
   **implemented** (ADR-007, third update): the Gateway sends `x-actor-id` and `x-actor-roles` as
