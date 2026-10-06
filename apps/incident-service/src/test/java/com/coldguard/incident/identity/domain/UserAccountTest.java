@@ -3,6 +3,7 @@ package com.coldguard.incident.identity.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.coldguard.commons.security.Role;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;

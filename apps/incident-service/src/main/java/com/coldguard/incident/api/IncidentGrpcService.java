@@ -1,5 +1,6 @@
 package com.coldguard.incident.api;
 
+import com.coldguard.commons.security.ActorServerInterceptor;
 import com.coldguard.incident.application.CloseIncidentCommand;
 import com.coldguard.incident.application.CloseIncidentService;
 import com.coldguard.incident.application.CreateIncidentCommand;
@@ -16,7 +17,6 @@ import com.coldguard.incident.grpc.v1.CloseIncidentResponse;
 import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.CreateIncidentResponse;
 import com.coldguard.incident.grpc.v1.IncidentServiceGrpc;
-import com.coldguard.incident.identity.api.ActorServerInterceptor;
 import io.grpc.stub.StreamObserver;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;

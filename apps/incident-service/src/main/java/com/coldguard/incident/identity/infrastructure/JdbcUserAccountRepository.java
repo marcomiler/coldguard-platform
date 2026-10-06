@@ -1,8 +1,8 @@
 package com.coldguard.incident.identity.infrastructure;
 
+import com.coldguard.commons.security.Role;
 import com.coldguard.incident.identity.application.UserAccountRepository;
 import com.coldguard.incident.identity.application.UserAlreadyExistsException;
-import com.coldguard.incident.identity.domain.Role;
 import com.coldguard.incident.identity.domain.UserAccount;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;

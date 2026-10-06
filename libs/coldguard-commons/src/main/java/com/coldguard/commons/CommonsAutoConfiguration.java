@@ -3,6 +3,7 @@ package com.coldguard.commons;
 import com.coldguard.commons.correlation.CorrelationIdFilter;
 import com.coldguard.commons.grpc.CorrelationClientInterceptor;
 import com.coldguard.commons.grpc.CorrelationServerInterceptor;
+import com.coldguard.commons.security.ActorServerInterceptor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -61,6 +62,26 @@ public class CommonsAutoConfiguration {
     @ConditionalOnMissingBean
     CorrelationClientInterceptor correlationClientInterceptor() {
       return new CorrelationClientInterceptor();
+    }
+  }
+
+  /**
+   * Trusts the actor propagated by the Gateway only when the mTLS peer is the Gateway; see {@link
+   * ActorServerInterceptor}.
+   */
+  @Configuration(proxyBeanMethods = false)
+  @ConditionalOnClass(name = "org.springframework.grpc.server.GlobalServerInterceptor")
+  @ConditionalOnProperty(
+      prefix = "coldguard.security.actor",
+      name = "enabled",
+      matchIfMissing = true)
+  static class GrpcServerActor {
+
+    @Bean
+    @GlobalServerInterceptor
+    @ConditionalOnMissingBean
+    ActorServerInterceptor actorServerInterceptor() {
+      return new ActorServerInterceptor();
     }
   }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.coldguard.commons.correlation.CorrelationIdFilter;
 import com.coldguard.commons.grpc.CorrelationClientInterceptor;
 import com.coldguard.commons.grpc.CorrelationServerInterceptor;
+import com.coldguard.commons.security.ActorServerInterceptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -62,5 +63,17 @@ class CommonsAutoConfigurationTest {
     webRunner
         .withBean("customFilter", CorrelationIdFilter.class, () -> custom)
         .run(context -> assertThat(context.getBean(CorrelationIdFilter.class)).isSameAs(custom));
+  }
+
+  @Test
+  void servletApp_registersTheActorInterceptor() {
+    webRunner.run(context -> assertThat(context).hasSingleBean(ActorServerInterceptor.class));
+  }
+
+  @Test
+  void actorPropertyDisabled_removesTheActorInterceptor() {
+    webRunner
+        .withPropertyValues("coldguard.security.actor.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(ActorServerInterceptor.class));
   }
 }

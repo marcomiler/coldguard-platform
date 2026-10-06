@@ -86,8 +86,9 @@ Notas:
 - Defensa en profundidad: los casos de uso sensibles validan el rol en `application` (hoy,
   `CloseIncidentService` exige `MAINTENANCE_TECHNICIAN`, RN-019). Una llamada sin actor se rechaza
   con `PERMISSION_DENIED`.
-- Hoy solo Incident Service tiene servidor gRPC con este interceptor; asset y telemetry deberán
-  reutilizarlo cuando expongan gRPC.
+- El interceptor, `Actor` y `Role` viven en `coldguard-commons` (`com.coldguard.commons.security`) y
+  se registran por autoconfiguración en todo servicio con servidor gRPC; hoy lo usan Incident y
+  Asset. Telemetry deberá usarlo cuando exponga gRPC.
 
 ## CORS y superficie pública
 

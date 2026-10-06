@@ -1,6 +1,6 @@
 package com.coldguard.incident.identity.application;
 
-import com.coldguard.incident.identity.domain.Role;
+import com.coldguard.commons.security.Role;
 import java.util.Set;
 
 /** {@code password} is sensitive: never log or print this command. */

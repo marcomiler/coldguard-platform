@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.coldguard.commons.security.ActorServerInterceptor;
 import com.coldguard.incident.application.CloseIncidentService;
 import com.coldguard.incident.application.CreateIncidentService;
 import com.coldguard.incident.application.IncidentRepository;
@@ -16,7 +17,6 @@ import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.Criticality;
 import com.coldguard.incident.grpc.v1.IncidentServiceGrpc;
 import com.coldguard.incident.grpc.v1.Magnitude;
-import com.coldguard.incident.identity.api.ActorServerInterceptor;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;

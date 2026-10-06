@@ -1,8 +1,8 @@
 package com.coldguard.incident.application;
 
+import com.coldguard.commons.security.Actor;
+import com.coldguard.commons.security.Role;
 import com.coldguard.incident.domain.Incident;
-import com.coldguard.incident.identity.domain.Actor;
-import com.coldguard.incident.identity.domain.Role;
 import org.springframework.stereotype.Service;
 
 /**

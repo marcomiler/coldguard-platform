@@ -2,6 +2,9 @@ package com.coldguard.incident.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.coldguard.commons.security.Actor;
+import com.coldguard.commons.security.ActorServerInterceptor;
+import com.coldguard.commons.security.Role;
 import com.coldguard.incident.application.CloseIncidentService;
 import com.coldguard.incident.application.CreateIncidentService;
 import com.coldguard.incident.application.IncidentRepository;
@@ -14,9 +17,6 @@ import com.coldguard.incident.grpc.v1.Criticality;
 import com.coldguard.incident.grpc.v1.IncidentStatus;
 import com.coldguard.incident.grpc.v1.Magnitude;
 import com.coldguard.incident.grpc.v1.Priority;
-import com.coldguard.incident.identity.api.ActorServerInterceptor;
-import com.coldguard.incident.identity.domain.Actor;
-import com.coldguard.incident.identity.domain.Role;
 import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;

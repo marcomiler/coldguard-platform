@@ -1,7 +1,5 @@
-package com.coldguard.incident.identity.api;
+package com.coldguard.commons.security;
 
-import com.coldguard.incident.identity.domain.Actor;
-import com.coldguard.incident.identity.domain.Role;
 import io.grpc.Attributes;
 import io.grpc.Context;
 import io.grpc.Contexts;
@@ -20,9 +18,6 @@ import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.grpc.server.GlobalServerInterceptor;
-import org.springframework.stereotype.Component;
 
 /**
  * Exposes the actor propagated by the Gateway ({@code x-actor-id}, {@code x-actor-roles}) via
@@ -33,8 +28,6 @@ import org.springframework.stereotype.Component;
  * From any other client the identity headers are ignored and the call runs without an actor, so a
  * service holding a valid certificate cannot impersonate a user.
  */
-@Component
-@GlobalServerInterceptor
 public class ActorServerInterceptor implements ServerInterceptor {
 
   public static final Metadata.Key<String> ACTOR_ID_KEY =
@@ -49,7 +42,6 @@ public class ActorServerInterceptor implements ServerInterceptor {
 
   private final Predicate<Attributes> trustedPeer;
 
-  @Autowired
   public ActorServerInterceptor() {
     this(ActorServerInterceptor::isGatewayPeer);
   }

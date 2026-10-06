@@ -11,8 +11,9 @@
 - The Gateway is the sole component that validates the JWT at the edge (ADR-008). Propagation is
   **implemented** (ADR-007, third update): the Gateway sends `x-actor-id` and `x-actor-roles` as
   gRPC metadata over mTLS, and `incident-service` (`ActorServerInterceptor`) accepts it only when
-  the peer certificate CN is `gateway`; from any other client it is ignored. Services without a
-  gRPC server (asset, telemetry) must reuse that interceptor when they get one. Internal services
+  the peer certificate CN is `gateway`; from any other client it is ignored. The
+  interceptor, `Actor` and `Role` live in `coldguard-commons` and are auto-registered in every
+  service with a gRPC server (incident and asset today); telemetry must use it when it gets one. Internal services
   must never parse or trust a raw `Authorization` header themselves — that re-implements edge auth
   regardless of which mechanism is eventually picked.
 - Never log secrets, tokens, or credentials — in code, telemetry, traces, or business events

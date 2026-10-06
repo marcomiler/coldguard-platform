@@ -1,4 +1,4 @@
-package com.coldguard.incident.identity.domain;
+package com.coldguard.commons.security;
 
 import java.util.Objects;
 import java.util.Set;
