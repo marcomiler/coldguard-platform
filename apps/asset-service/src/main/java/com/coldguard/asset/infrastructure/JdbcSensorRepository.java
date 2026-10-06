@@ -1,10 +1,12 @@
 package com.coldguard.asset.infrastructure;
 
+import com.coldguard.asset.application.DueSensor;
 import com.coldguard.asset.application.SensorRepository;
 import com.coldguard.asset.domain.AlreadyExistsException;
 import com.coldguard.asset.domain.Sensor;
 import com.coldguard.asset.domain.SensorStatus;
 import com.coldguard.asset.domain.StaleVersionException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -100,6 +102,31 @@ class JdbcSensorRepository implements SensorRepository {
       throw new StaleVersionException("Sensor", sensor.id());
     }
     return sensor.withVersion(sensor.version() + 1);
+  }
+
+  @Override
+  public List<DueSensor> findDueForCalibrationExpiry(Instant now, DueSensor after, int limit) {
+    java.sql.Timestamp afterAt = after == null ? null : JdbcSupport.timestamp(after.validUntil());
+    UUID afterId = after == null ? null : after.sensorId();
+    return jdbc.sql(
+            """
+            SELECT id, last_calibration_valid_until
+              FROM sensor
+             WHERE status IN ('ACTIVE', 'INACTIVE')
+               AND last_calibration_valid_until IS NOT NULL
+               AND last_calibration_valid_until < ?
+               AND (?::timestamptz IS NULL
+                    OR (last_calibration_valid_until, id) > (?::timestamptz, ?::uuid))
+             ORDER BY last_calibration_valid_until, id
+             LIMIT ?
+            """)
+        .params(JdbcSupport.timestamp(now), afterAt, afterAt, afterId, limit)
+        .query(
+            (rs, row) ->
+                new DueSensor(
+                    rs.getObject("id", UUID.class),
+                    JdbcSupport.instant(rs, "last_calibration_valid_until")))
+        .list();
   }
 
   @Override

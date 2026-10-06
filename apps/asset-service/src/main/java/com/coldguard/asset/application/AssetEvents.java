@@ -49,6 +49,9 @@ final class AssetEvents {
 
   record SensorRetired(UUID sensorId, UUID assetId, String previousStatus, String reason) {}
 
+  record SensorCalibrationExpired(
+      UUID sensorId, UUID calibrationId, Instant expiredAt, Instant detectedAt) {}
+
   static OutboundEvent assetRegistered(Asset asset, EventActor actor, Instant now) {
     return new OutboundEvent(
         "AssetRegistered",
@@ -152,6 +155,19 @@ final class AssetEvents {
         actor,
         now,
         new SensorReassigned(after.id(), before.assetId(), after.assetId(), reason));
+  }
+
+  static OutboundEvent sensorCalibrationExpired(
+      UUID sensorId, UUID calibrationId, Instant expiredAt, Instant detectedAt, EventActor actor) {
+    return new OutboundEvent(
+        "SensorCalibrationExpired",
+        1,
+        SENSOR,
+        sensorId.toString(),
+        "asset.sensor-calibration-expired",
+        actor,
+        detectedAt,
+        new SensorCalibrationExpired(sensorId, calibrationId, expiredAt, detectedAt));
   }
 
   private static Map<String, Object> values(Asset asset, List<String> fields) {

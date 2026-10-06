@@ -71,6 +71,12 @@ coldguard:
       # Validity applied to a calibration when the sensor's profile defines none. Empty means no
       # default: recording a calibration is then refused rather than inventing a value.
       default-validity: ${ASSET_CALIBRATION_DEFAULT_VALIDITY:}
+    calibration-expiry:
+      # Moves sensors with an expired calibration to maintenance (RN-018). Single instance only.
+      enabled: ${ASSET_CALIBRATION_EXPIRY_ENABLED:true}
+      # Every 5 minutes (academic placeholder, configurable).
+      cron: ${ASSET_CALIBRATION_EXPIRY_CRON:0 */5 * * * *}
+      batch-size: 100
     page:
       max-size: 100
   outbox:

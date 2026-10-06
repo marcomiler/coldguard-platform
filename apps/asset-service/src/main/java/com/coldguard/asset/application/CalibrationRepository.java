@@ -6,4 +6,7 @@ import com.coldguard.asset.domain.CalibrationRecord;
 public interface CalibrationRepository {
 
   void insert(CalibrationRecord record);
+
+  /** The most recently recorded calibration of the sensor, if it has any. */
+  java.util.Optional<java.util.UUID> findLatestId(java.util.UUID sensorId);
 }

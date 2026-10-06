@@ -3,6 +3,7 @@ package com.coldguard.asset.support;
 import com.coldguard.asset.application.AssetRepository;
 import com.coldguard.asset.application.AssignmentEntry;
 import com.coldguard.asset.application.CalibrationRepository;
+import com.coldguard.asset.application.DueSensor;
 import com.coldguard.asset.application.EvaluationContextRepository;
 import com.coldguard.asset.application.HistoryCursor;
 import com.coldguard.asset.application.OperationalProfileRepository;
@@ -21,6 +22,7 @@ import com.coldguard.asset.domain.Sensor;
 import com.coldguard.asset.domain.SensorStatus;
 import com.coldguard.asset.domain.Site;
 import com.coldguard.asset.domain.StaleVersionException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -47,7 +49,23 @@ public class InMemoryAssetStore {
   public final AssetRepository assetRepository = new Assets();
   public final SensorRepository sensorRepository = new Sensors();
   public final OperationalProfileRepository profileRepository = new Profiles();
-  public final CalibrationRepository calibrationRepository = calibrations::add;
+  public final CalibrationRepository calibrationRepository =
+      new CalibrationRepository() {
+        @Override
+        public void insert(CalibrationRecord record) {
+          calibrations.add(record);
+        }
+
+        @Override
+        public Optional<UUID> findLatestId(UUID sensorId) {
+          return calibrations.stream()
+              .filter(c -> c.sensorId().equals(sensorId))
+              .max(
+                  Comparator.comparing(CalibrationRecord::recordedAt)
+                      .thenComparing(CalibrationRecord::id))
+              .map(CalibrationRecord::id);
+        }
+      };
   public final SensorHistoryRepository historyRepository =
       new SensorHistoryRepository() {
         @Override
@@ -228,6 +246,24 @@ public class InMemoryAssetStore {
       Sensor saved = sensor.withVersion(sensor.version() + 1);
       sensors.put(saved.id(), saved);
       return saved;
+    }
+
+    @Override
+    public List<DueSensor> findDueForCalibrationExpiry(Instant now, DueSensor after, int limit) {
+      return sensors.values().stream()
+          .filter(s -> s.status() == SensorStatus.ACTIVE || s.status() == SensorStatus.INACTIVE)
+          .filter(s -> s.lastCalibrationValidUntil() != null)
+          .filter(s -> s.lastCalibrationValidUntil().isBefore(now))
+          .map(s -> new DueSensor(s.id(), s.lastCalibrationValidUntil()))
+          .filter(
+              d ->
+                  after == null
+                      || d.validUntil().isAfter(after.validUntil())
+                      || (d.validUntil().equals(after.validUntil())
+                          && d.sensorId().compareTo(after.sensorId()) > 0))
+          .sorted(Comparator.comparing(DueSensor::validUntil).thenComparing(DueSensor::sensorId))
+          .limit(limit)
+          .toList();
     }
 
     @Override

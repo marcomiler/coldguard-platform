@@ -16,6 +16,20 @@ class JdbcCalibrationRepository implements CalibrationRepository {
   }
 
   @Override
+  public java.util.Optional<java.util.UUID> findLatestId(java.util.UUID sensorId) {
+    return jdbc.sql(
+            """
+            SELECT id FROM calibration_record
+             WHERE sensor_id = ?
+             ORDER BY recorded_at DESC, id DESC
+             LIMIT 1
+            """)
+        .param(sensorId)
+        .query(java.util.UUID.class)
+        .optional();
+  }
+
+  @Override
   public void insert(CalibrationRecord record) {
     jdbc.sql(
             """

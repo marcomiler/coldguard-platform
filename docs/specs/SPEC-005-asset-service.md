@@ -352,6 +352,81 @@ ciclo completo por gRPC con el certificado `gateway`; el contexto lo lee `teleme
 rechazan el Gateway con un administrador, el Gateway haciéndose pasar por `system:telemetry-service`,
 `telemetry-service` intentando cambiar un estado y `sensor-simulator`.
 
-Pendiente: entrega 3 (tarea programada de vencimiento, que ejecutará la transición con
-`Actor.system("calibration-expiry-job")` y publicará `SensorCalibrationExpired`) y entrega 4
-(rutas del Gateway y `component-diagram.md`).
+Pendiente: ~~entrega 3~~ y ~~entrega 4~~, hechas, ver abajo.
+
+### Entrega 3 — Tarea de vencimiento de calibración (2026-10-06)
+
+Hecho:
+- `CalibrationExpiryService`: recorre por teclado `(vencimiento, id)` los sensores ACTIVOS o
+  INACTIVOS con calibración vencida (índice parcial `ix_sensor_calibration_due`) y mueve cada uno a
+  EN_MANTENIMIENTO con el actor de sistema `calibration-expiry-job` y el motivo fijo
+  "calibración/verificación vencida". Una transacción por sensor (un fallo no revierte el lote), la
+  elegibilidad se revalida dentro de ella, y el recorrido termina aunque un sensor falle siempre.
+  Publica `SensorCalibrationExpired` y `SensorStatusChanged`; el historial queda con `actorType`
+  SYSTEM.
+- Idempotente por construcción: un sensor ya en mantenimiento no se vuelve a seleccionar.
+- `CalibrationExpiryScheduler` (`@Scheduled`, cron `coldguard.asset.calibration-expiry.cron`,
+  habilitable con `...enabled`, lote `...batch-size`) y los contadores
+  `coldguard.asset.calibration.expired` y `coldguard.asset.calibration.expiry.failures`.
+- Pensada para una sola instancia (documentado en el código).
+
+Decisiones tomadas en la implementación:
+- Un sensor con vencimiento pero sin registro de calibración se cuenta como fallo, no se omite en
+  silencio: indica un dato inconsistente.
+- El historial de un cambio automático guarda el nombre del proceso (`calibration-expiry-job`),
+  igual que el actor del evento, sin el prefijo interno `system:`.
+
+Verificación: tests unitarios (elegibilidad, un vencimiento exactamente ahora no cuenta,
+idempotencia, aislamiento de fallos, lotes pequeños que terminan, revalidación) e integración
+contra PostgreSQL real (recorrido por teclado con caducidades idénticas, una fila inconsistente
+que se revierte sola sin dejar rastro mientras los demás sensores se mueven, secuencia de eventos
+con `aggregate_version`) y un test donde la tarea se dispara sola con su propio cron cada segundo,
+incluido el contador. No se validó manualmente en Compose con el cron de 5 minutos.
+
+### Entrega 4 — Rutas del Gateway (2026-10-06)
+
+Hecho:
+- Recursos REST de Asset según SPEC-009: `GET/POST /organizations`,
+  `GET/POST /organizations/{id}/sites`, `GET/POST /assets`, `GET/PATCH /assets/{id}`,
+  `GET/POST /sensors`, `GET/PATCH /sensors/{id}`, `GET/PUT /sensors/{id}/profile`,
+  `POST /sensors/{id}/status|calibrations|reassignment|retirement` y
+  `GET /sensors/{id}/history`. Roles según la tabla de `docs/security/authn-authz.md`; `RbacPolicyTest`
+  sigue recorriendo la tabla con los controladores reales.
+- Canal gRPC `asset-service` con mTLS y su deadline (`coldguard.gateway.downstream.asset-service`,
+  5 s); en Compose, `ASSET_SERVICE_HOST` y `ASSET_SERVICE_GRPC_PORT`.
+- Infraestructura común de SPEC-009 (ver ese spec, "Avance").
+- Enums REST propios (`HIGH`, `IN_MAINTENANCE`, `VERIFICATION`), duraciones como segundos,
+  `201` + `Location` en activo y sensor, sobres de paginación por página y por cursor.
+- `component-diagram.md` con los componentes de Asset; `state-machines.md` con los TODO resueltos.
+
+Decisiones tomadas en la implementación:
+- El Gateway valida solo la forma (obligatorios, longitudes, formatos). No repite
+  `@PastOrPresent` ni positividad de duraciones: el servicio es la única autoridad y un reloj
+  adelantado del cliente no debe dar un rechazo que el servicio no daría.
+- Organización y sede no devuelven `Location`: no existe `GET` por id para ellas en el catálogo;
+  las calibraciones tampoco (no son un recurso direccionable).
+- PATCH: un campo ausente o `null` queda como está; una descripción en blanco la borra.
+
+Verificación: 158 tests en gateway (rutas y mapeo de cada recurso, validación sin eco del valor,
+enums fuera del vocabulario REST rechazados, tabla completa de estados gRPC→HTTP, ninguna
+descripción interna llega al cliente, `correlationId` igual a la cabecera, `GrpcInvoker` contra un
+servidor real con deadline y trailer, y un test que impide que un tipo REST importe clases
+generadas de gRPC). En Compose por REST con login real: el ciclo completo, los conflictos con su
+código, el historial paginado, RBAC por rol, y con asset-service detenido sus rutas dan `503` en
+0,04 s mientras login, usuarios e incidentes siguen funcionando.
+
+### Estado de los criterios de aceptación
+
+| # | Criterio | Estado |
+|---|---|---|
+| 1 | Alta organización → sede → activo → sensor → perfil, con sus eventos en RabbitMQ | Alta verificada por REST; los eventos quedan en el outbox y se publican cuando una cola está enlazada (ver el hallazgo de la entrega 1; lo cierra SPEC-007) |
+| 2 | Transición no permitida: 409 sin cambio ni auditoría | Cumplido |
+| 3 | EN_MANTENIMIENTO → ACTIVO exige calibración posterior; calibrar no reactiva | Cumplido |
+| 4 | INACTIVO → ACTIVO con calibración vigente sí, vencida no | Cumplido (tests unitarios e integración) |
+| 5 | Reasignar solo en mantenimiento y conservar la asociación anterior | Cumplido |
+| 6 | Retiro terminal con historial consultable y sin borrado | Cumplido |
+| 7 | Una calibración corta lleva el sensor a mantenimiento por sí sola, con actor de sistema | Cumplido en test de integración con cron; sin validación manual en Compose |
+| 8 | Toda entrada de historial con actor, fecha, motivo y valor anterior/posterior | Cumplido |
+
+Pendiente de SPEC-005: ninguno propio. Dependen de otros specs: la publicación efectiva de los
+eventos (SPEC-007), `GET /sensors/{id}/readings` y `GET /sensors/connectivity` (SPEC-006).
