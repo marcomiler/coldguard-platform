@@ -1,4 +1,4 @@
-package com.coldguard.gateway.api.asset;
+package com.coldguard.gateway.api.common;
 
 import java.util.List;
 

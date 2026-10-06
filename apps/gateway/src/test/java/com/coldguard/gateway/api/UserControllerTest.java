@@ -51,11 +51,11 @@ class UserControllerTest {
     mockMvc
         .perform(get("/api/v1/users"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.users[0].username").value("marta"))
-        .andExpect(jsonPath("$.users[0].roles[0]").value("AUDITOR"))
-        .andExpect(jsonPath("$.users[0].password").doesNotExist())
-        .andExpect(jsonPath("$.users[0].passwordHash").doesNotExist())
-        .andExpect(jsonPath("$.totalElements").value(1));
+        .andExpect(jsonPath("$.items[0].username").value("marta"))
+        .andExpect(jsonPath("$.items[0].roles[0]").value("AUDITOR"))
+        .andExpect(jsonPath("$.items[0].password").doesNotExist())
+        .andExpect(jsonPath("$.items[0].passwordHash").doesNotExist())
+        .andExpect(jsonPath("$.page.totalElements").value(1));
   }
 
   @Test
