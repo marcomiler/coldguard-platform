@@ -93,8 +93,9 @@ Para reiniciar de cero: `docker compose down` y `docker volume rm local_postgres
 | Sensores: alta, datos técnicos, perfil operativo | `/sensors`, `/sensors/{id}`, `/sensors/{id}/profile` | Real |
 | Ciclo de vida del sensor: estado, calibración, reasignación, retiro | `/sensors/{id}/status`, `/calibrations`, `/reassignment`, `/retirement` | Real |
 | Historial del sensor | `/sensors/{id}/history` | Real |
-| Inyectar lecturas de prueba | `POST /telemetry/test-readings` | Planificado (SPEC-006) |
-| Lecturas y conectividad | `/sensors/{id}/readings`, `/sensors/connectivity` | Planificado (SPEC-006) |
+| Inyectar lecturas de prueba | `POST /telemetry/test-readings` | Real |
+| Lecturas de un sensor | `/sensors/{id}/readings` (requiere `from` y `to`) | Real |
+| Conectividad | `/sensors/connectivity` | Planificado (SPEC-006, entrega B) |
 | Tablero de incidentes, detalle, reconocer, escalar, cerrar | `/incidents…` | Planificado (SPEC-007) |
 | Métricas operativas | `/metrics/incidents` | Planificado (SPEC-007) |
 | Bitácora de auditoría | `/audit-records` | Planificado (SPEC-007) |

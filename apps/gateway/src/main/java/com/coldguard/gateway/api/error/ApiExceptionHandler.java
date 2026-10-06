@@ -12,6 +12,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -21,7 +22,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
  * carries a stable {@code code} and the {@code correlationId}; request values are never echoed. Add
  * a package to {@code basePackages} when another resource adopts these conventions.
  */
-@RestControllerAdvice(basePackages = "com.coldguard.gateway.api.asset")
+@RestControllerAdvice(
+    basePackages = {"com.coldguard.gateway.api.asset", "com.coldguard.gateway.api.telemetry"})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiExceptionHandler {
 
@@ -54,6 +56,16 @@ public class ApiExceptionHandler {
   public ResponseEntity<ProblemDetail> handleMalformedBody(HttpMessageNotReadableException e) {
     return problem(
         HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST_BODY", "Malformed request body", null);
+  }
+
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<ProblemDetail> handleMissingParameter(
+      MissingServletRequestParameterException e) {
+    return problem(
+        HttpStatus.BAD_REQUEST,
+        "INVALID_REQUEST",
+        "The parameter '" + e.getParameterName() + "' is required",
+        null);
   }
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)

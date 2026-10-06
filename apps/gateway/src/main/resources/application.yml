@@ -18,6 +18,11 @@ spring:
           ssl:
             enabled: true
             bundle: gateway-client
+        telemetry-service:
+          address: static://${TELEMETRY_SERVICE_HOST:localhost}:${TELEMETRY_SERVICE_GRPC_PORT:9092}
+          ssl:
+            enabled: true
+            bundle: gateway-client
         incident-service:
           address: static://${INCIDENT_SERVICE_HOST:localhost}:${INCIDENT_SERVICE_GRPC_PORT:9093}
           ssl:
@@ -42,6 +47,8 @@ coldguard:
       # Deadline of every call to the service; commands are never retried by the Gateway.
       asset-service:
         deadline: ${ASSET_SERVICE_DEADLINE:5s}
+      telemetry-service:
+        deadline: ${TELEMETRY_SERVICE_DEADLINE:5s}
     cors:
       # Explicit origins only ('*' is rejected at startup); empty means no cross-origin access.
       allowed-origins: ${COLDGUARD_CORS_ALLOWED_ORIGINS:}

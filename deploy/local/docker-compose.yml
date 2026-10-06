@@ -40,6 +40,9 @@ services:
       # Same rule for the Asset Service certificate (SAN asset-service).
       ASSET_SERVICE_HOST: asset-service
       ASSET_SERVICE_GRPC_PORT: 9091
+      # And for the Telemetry Service (SAN telemetry-service).
+      TELEMETRY_SERVICE_HOST: telemetry-service
+      TELEMETRY_SERVICE_GRPC_PORT: 9092
       TLS_CERTS_DIR: /certs
       # Signing key pair: only the Gateway mounts it (deploy/local/jwt, git-ignored).
       JWT_PRIVATE_KEY_PATH: /jwt/jwt-private.pem
@@ -114,6 +117,13 @@ services:
     container_name: coldguard-telemetry-service
     environment:
       <<: [*java-env, *db-env, *amqp-env]
+      GRPC_SERVER_PORT: 9092
+      TLS_CERTS_DIR: /certs
+      # Asset Service address; its certificate SAN is asset-service.
+      ASSET_SERVICE_HOST: asset-service
+      ASSET_SERVICE_GRPC_PORT: 9091
+    volumes:
+      - ./certs:/certs:ro
     healthcheck:
       test:
         [

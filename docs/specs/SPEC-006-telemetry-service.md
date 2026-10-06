@@ -213,6 +213,33 @@ camino usa JPA para escritura masiva; Hikari `maximum-pool-size` configurable.
 7. Endpoint gRPC + handler de errores; rutas del Gateway.
 8. Corregir `data-flow.md`/`container-diagram.md` (D-05) y `bounded-contexts.md` (D-06).
 
+## Implementación
+
+**Entrega A (hecha):** ingesta idempotente por `reading_id`, evaluación (rango, magnitud, racha de
+persistencia, lecturas tardías, elegibilidad), contextos de Asset con caché Caffeine, publicación
+de `TelemetryThresholdBreached` por el outbox (un evento por lectura fuera de rango, con
+`persistent` falso hasta alcanzar la racha), RPC `IngestReadings` y de consulta, y en el Gateway
+`POST /telemetry/test-readings` y `GET /sensors/{id}/readings`.
+
+**Decisiones tomadas:** el evento se emite en cada anomalía elegible y no tardía, no solo al
+volverse persistente (el incidente decide qué hacer con `persistent`); las lecturas sin
+`readingId` reciben uno generado, de modo que reenviarlas no es idempotente; la caché sirve
+sensores ya conocidos con Asset caído y los desconocidos fallan con `UNAVAILABLE` (503
+`UPSTREAM_UNAVAILABLE` en REST) antes de persistir.
+
+**Verificación:** unitarias, de cableado gRPC e integración con PostgreSQL (telemetry); contrato
+REST y RBAC (gateway). En Docker Compose: lecturas fuera de rango → 3 eventos publicados
+(`persistent` false, false, true) en `incident-service.telemetry-threshold-breached`; reenvío →
+`DUPLICATE`; sensores en mantenimiento/inactivo → `eligible=false`; unidad errónea →
+`UNIT_MISMATCH`; sensor inexistente → `SENSOR_NOT_FOUND`; sin token → 401; Asset detenido →
+sensor en caché 200, sensor no cacheado 503, recuperación al reiniciarlo. No verificado en
+Compose: la autorización por CN del simulador frente al del Gateway (los puertos gRPC no se
+publican y no hay `grpcurl`); queda cubierta por las pruebas de cableado en proceso.
+
+**Pendiente (entrega B):** consumidor de cambios de Asset (invalidación de caché), tarea de
+conectividad, `ListConnectivityStatus` y `GET /sensors/connectivity`, y las correcciones D-05/D-06
+de documentación.
+
 ## Riesgos
 
 - Crecimiento de `telemetry_reading` sin retención (D-16); el índice compuesto mantiene acotadas

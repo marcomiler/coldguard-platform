@@ -16,37 +16,42 @@ import org.junit.jupiter.api.Test;
  */
 class RestContractIsolationTest {
 
-  private static final Path SOURCES = Path.of("src/main/java/com/coldguard/gateway/api/asset");
+  private static final List<Path> SOURCES =
+      List.of(
+          Path.of("src/main/java/com/coldguard/gateway/api/asset"),
+          Path.of("src/main/java/com/coldguard/gateway/api/telemetry"));
   private static final Pattern GENERATED =
       Pattern.compile("import com\\.coldguard\\.[a-z]+\\.grpc\\.");
 
   @Test
   void noRestTypeImportsAGeneratedGrpcClass() throws IOException {
-    assertThat(Files.isDirectory(SOURCES)).as("run from the module directory").isTrue();
-    List<String> offenders;
-    try (Stream<Path> files = Files.list(SOURCES)) {
-      offenders =
-          files
-              .filter(file -> file.toString().endsWith(".java"))
-              .filter(file -> !isGrpcAware(file))
-              .filter(
-                  file -> {
-                    try {
-                      return GENERATED.matcher(Files.readString(file)).find();
-                    } catch (IOException e) {
-                      throw new IllegalStateException(e);
-                    }
-                  })
-              .map(file -> file.getFileName().toString())
-              .toList();
+    List<String> offenders = new java.util.ArrayList<>();
+    for (Path directory : SOURCES) {
+      assertThat(Files.isDirectory(directory))
+          .as("run from the module directory: " + directory)
+          .isTrue();
+      try (Stream<Path> files = Files.list(directory)) {
+        files
+            .filter(file -> file.toString().endsWith(".java"))
+            .filter(file -> !isGrpcAware(file))
+            .filter(
+                file -> {
+                  try {
+                    return GENERATED.matcher(Files.readString(file)).find();
+                  } catch (IOException e) {
+                    throw new IllegalStateException(e);
+                  }
+                })
+            .forEach(file -> offenders.add(directory.getFileName() + "/" + file.getFileName()));
+      }
     }
 
     assertThat(offenders).as("REST types importing generated gRPC classes").isEmpty();
   }
 
-  /** The mapper translates; the controllers hold the request-side calls that need a proto id. */
+  /** The mappers translate; the controllers hold the request-side calls that need a proto id. */
   private static boolean isGrpcAware(Path file) {
     String name = file.getFileName().toString();
-    return name.equals("AssetRestMapper.java") || name.endsWith("Controller.java");
+    return name.endsWith("RestMapper.java") || name.endsWith("Controller.java");
   }
 }

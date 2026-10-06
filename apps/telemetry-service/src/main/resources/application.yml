@@ -10,6 +10,39 @@ spring:
       enabled: true
   lifecycle:
     timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
+  grpc:
+    server:
+      # Explicit per-service gRPC port (9091 asset, 9092 telemetry, 9093 incident).
+      port: ${GRPC_SERVER_PORT:9092}
+      ssl:
+        enabled: true
+        bundle: telemetry-service-server
+        # mTLS: only certificates signed by the local dev CA are accepted.
+        client-auth: require
+    client:
+      channels:
+        asset-service:
+          address: static://${ASSET_SERVICE_HOST:localhost}:${ASSET_SERVICE_GRPC_PORT:9091}
+          ssl:
+            enabled: true
+            # This service presents its own certificate (CN telemetry-service) to Asset, which
+            # recognizes it as an internal caller, and trusts only the local dev CA.
+            bundle: telemetry-service-client
+  ssl:
+    bundle:
+      pem:
+        telemetry-service-server:
+          keystore:
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/telemetry-service/telemetry-service.crt
+            private-key: file:${TLS_CERTS_DIR:../../deploy/local/certs}/telemetry-service/telemetry-service.key
+          truststore:
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/ca/ca.crt
+        telemetry-service-client:
+          keystore:
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/telemetry-service/telemetry-service.crt
+            private-key: file:${TLS_CERTS_DIR:../../deploy/local/certs}/telemetry-service/telemetry-service.key
+          truststore:
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/ca/ca.crt
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:coldguard}?currentSchema=telemetry
     username: ${DB_USER:coldguard}
@@ -39,9 +72,27 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: none
+      ddl-auto: validate
 
 coldguard:
+  security:
+    # Internal services that call Telemetry with their own certificate, not for a user. The
+    # simulator may ingest simulated readings; it can do nothing else.
+    system-callers: ${TELEMETRY_SYSTEM_CALLERS:sensor-simulator}
+  telemetry:
+    ingest:
+      max-batch-size: 500
+      # A reading stamped further ahead than this is rejected (clock skew allowance).
+      future-tolerance: 30s
+    evaluation-context-cache:
+      ttl: 60s
+      max-size: 10000
+    asset-call-deadline: 2s
+    readings-query:
+      max-range: 7d
+    page:
+      max-size: 100
+      default-size: 20
   outbox:
     enabled: true
     poll-interval: 500ms
