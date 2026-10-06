@@ -157,6 +157,18 @@ Los controladores no contienen `if` de negocio: validar forma → mapear → inv
 4. Existe `contracts/rest/openapi.yaml` actualizado con todos los endpoints.
 5. El Gateway no contiene reglas RN (revisión: ningún cálculo de prioridad, estado ni guard).
 
+## Avance
+
+Desde SPEC-005 (entrega 4) existe la infraestructura común y la usa el recurso Asset:
+`GrpcInvoker` (deadline por servicio, `coldguard.gateway.downstream.<servicio>.deadline`),
+`DownstreamCallException` única, `GrpcStatusHttpMapper` (la tabla de arriba, con el código de
+negocio del trailer intacto y sin reenviar nunca la descripción de un error interno),
+`ApiExceptionHandler` único con Problem Details (`code`, `correlationId`, `errors` por campo sin
+eco del valor), DTO como `record` con Bean Validation y enums REST propios, paginación por
+página y por cursor. El advice se aplica por paquete (`api.asset`); Incident, Identity y Auth
+siguen con sus excepciones y advices propios hasta migrarlos. Pendiente: migrar esas rutas,
+OpenAPI (`contracts/rest/openapi.yaml`) y el límite de tamaño del cuerpo.
+
 ## Tareas
 
 1. Infraestructura común (GrpcInvoker, mapper de estados, advice, interceptores) y migración de

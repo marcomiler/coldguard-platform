@@ -26,7 +26,7 @@ final class HistoryEntries {
         newValue,
         reason,
         Actors.type(actor),
-        actor.id(),
+        Actors.id(actor),
         now);
   }
 }

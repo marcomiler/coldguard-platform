@@ -51,9 +51,13 @@ Notas:
 - El Operador solo lee incidentes: CU-004/CU-006 mencionan que "aporta contexto", pero no existe
   comando, RF ni evento para ello. Un comando del Operador requiere antes un RF/CU nuevo.
 - El Auditor lee solo la bitácora. **Pendiente de confirmar con el PO.**
-- Hoy el Gateway implementa `POST /auth/login`, los endpoints de incidentes (creación y cierre) y
-  la administración de usuarios (`/users`); el resto de las filas están declaradas en la política
-  pero la ruta aún no existe y responde `404` a quien tenga el rol.
+- Hoy el Gateway implementa `POST /auth/login`, los endpoints de incidentes (creación y cierre), la
+  administración de usuarios (`/users`) y los recursos de Asset (`/organizations`, `/assets`,
+  `/sensors` y sus sub-recursos); el resto de las filas (telemetría, métricas, bitácora, consulta
+  y gestión de incidentes) están declaradas en la política pero la ruta aún no existe y responde
+  `404` a quien tenga el rol.
+- `GET /sensors/connectivity` (Telemetry) comparte el patrón de `GET /sensors/{id}`: hasta que su
+  controlador exista, "connectivity" se trata como un id y Asset responde `404`.
 
 ## Administración de usuarios (`/users`)
 

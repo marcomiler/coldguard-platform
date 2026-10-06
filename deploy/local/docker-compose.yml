@@ -37,6 +37,9 @@ services:
       # Incident Service certificate was issued for (deploy/scripts/generate-dev-certs.sh).
       INCIDENT_SERVICE_HOST: incident-service
       INCIDENT_SERVICE_GRPC_PORT: 9093
+      # Same rule for the Asset Service certificate (SAN asset-service).
+      ASSET_SERVICE_HOST: asset-service
+      ASSET_SERVICE_GRPC_PORT: 9091
       TLS_CERTS_DIR: /certs
       # Signing key pair: only the Gateway mounts it (deploy/local/jwt, git-ignored).
       JWT_PRIVATE_KEY_PATH: /jwt/jwt-private.pem

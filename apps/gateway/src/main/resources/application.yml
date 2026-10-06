@@ -13,6 +13,11 @@ spring:
   grpc:
     client:
       channels:
+        asset-service:
+          address: static://${ASSET_SERVICE_HOST:localhost}:${ASSET_SERVICE_GRPC_PORT:9091}
+          ssl:
+            enabled: true
+            bundle: gateway-client
         incident-service:
           address: static://${INCIDENT_SERVICE_HOST:localhost}:${INCIDENT_SERVICE_GRPC_PORT:9093}
           ssl:
@@ -33,6 +38,10 @@ spring:
 
 coldguard:
   gateway:
+    downstream:
+      # Deadline of every call to the service; commands are never retried by the Gateway.
+      asset-service:
+        deadline: ${ASSET_SERVICE_DEADLINE:5s}
     cors:
       # Explicit origins only ('*' is rejected at startup); empty means no cross-origin access.
       allowed-origins: ${COLDGUARD_CORS_ALLOWED_ORIGINS:}

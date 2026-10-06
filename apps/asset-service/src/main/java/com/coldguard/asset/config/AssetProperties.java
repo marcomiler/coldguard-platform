@@ -8,10 +8,14 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record AssetProperties(
     @DefaultValue Calibration calibration,
     @DefaultValue Page page,
-    @DefaultValue EvaluationContext evaluationContext) {
+    @DefaultValue EvaluationContext evaluationContext,
+    @DefaultValue CalibrationExpiry calibrationExpiry) {
 
   /** {@code defaultValidity} stays null when unset: no value is invented. */
   public record Calibration(Duration defaultValidity) {}
+
+  /** {@code batchSize}: sensors read per query by the calibration expiry job. */
+  public record CalibrationExpiry(@DefaultValue("100") int batchSize) {}
 
   /** Most sensors an internal caller may ask for in one request. */
   public record EvaluationContext(@DefaultValue("500") int maxBatch) {}

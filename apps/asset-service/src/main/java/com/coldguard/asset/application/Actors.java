@@ -16,6 +16,11 @@ final class Actors {
         : EventActor.user(actor.id());
   }
 
+  /** The id recorded in history: the user id, or the bare process name of a system actor. */
+  static String id(Actor actor) {
+    return isSystem(actor) ? actor.id().substring(SYSTEM_PREFIX.length()) : actor.id();
+  }
+
   static String type(Actor actor) {
     return isSystem(actor) ? "SYSTEM" : "USER";
   }

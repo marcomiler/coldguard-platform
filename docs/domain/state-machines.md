@@ -81,9 +81,12 @@ detección de vencimiento que dispara una transición a EN_MANTENIMIENTO emite a
 ### TODO
 
 - Periodicidad o criterio exacto de vencimiento de la calibración/verificación: debe ser
-  configurable (RN-018); no se fija ningún valor numérico.
-- Qué constituye una "acción equivalente documentada" cuando la tarea programada detecta el
-  vencimiento y no ejecuta la transición a EN_MANTENIMIENTO directamente.
+  configurable (RN-018); no se fija ningún valor numérico. Implementado como configuración
+  (validez por perfil o por defecto, periodicidad de la tarea); los valores de demostración son
+  placeholder académico (DEC-022).
+- ~~Qué constituye una "acción equivalente documentada"~~ cuando la tarea programada detecta el
+  vencimiento: resuelto por DEC-022 e implementado en SPEC-005; la tarea ejecuta la transición a
+  EN_MANTENIMIENTO directamente, con el actor de sistema `calibration-expiry-job`.
 - RETIRADO como estado terminal es válido "para el MVP, salvo que exista una decisión futura
   documentada" (texto literal de la decisión); no se define aquí ninguna condición de reversión.
 

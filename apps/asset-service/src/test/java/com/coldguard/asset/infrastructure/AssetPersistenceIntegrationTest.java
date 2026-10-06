@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coldguard.asset.application.AssetCatalogService;
+import com.coldguard.asset.application.CalibrationExpiryService;
+import com.coldguard.asset.application.DueSensor;
 import com.coldguard.asset.application.EvaluationContextService;
 import com.coldguard.asset.application.OperationalProfileDraft;
 import com.coldguard.asset.application.OperationalProfileService;
 import com.coldguard.asset.application.SensorHistoryService;
 import com.coldguard.asset.application.SensorLifecycleService;
+import com.coldguard.asset.application.SensorRepository;
 import com.coldguard.asset.application.SensorService;
 import com.coldguard.asset.application.SensorService.InitialCalibration;
 import com.coldguard.asset.domain.AlreadyExistsException;
@@ -51,6 +54,7 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
     properties = {
       "spring.grpc.server.port=0",
       "coldguard.outbox.enabled=false",
+      "coldguard.asset.calibration-expiry.enabled=false",
       "coldguard.asset.calibration.default-validity=P90D"
     })
 class AssetPersistenceIntegrationTest {
@@ -77,6 +81,8 @@ class AssetPersistenceIntegrationTest {
   @Autowired SensorService sensors;
   @Autowired OperationalProfileService profiles;
   @Autowired SensorLifecycleService lifecycle;
+  @Autowired CalibrationExpiryService expiry;
+  @Autowired SensorRepository sensorRepository;
   @Autowired SensorHistoryService history;
   @Autowired EvaluationContextService contexts;
   @Autowired JdbcClient jdbc;
@@ -600,5 +606,168 @@ class AssetPersistenceIntegrationTest {
                 .query(Long.class)
                 .single())
         .isEqualTo(before + 1);
+  }
+
+  // ---- calibration expiry ----------------------------------------------------------------
+
+  /** A sensor whose only calibration expired {@code ago} before now. */
+  private Sensor expired(Asset asset, Instant performedAt) {
+    return sensors.register(
+        ADMIN,
+        asset.id(),
+        unique("SN"),
+        null,
+        "CELSIUS",
+        new InitialCalibration(CalibrationKind.CALIBRATION, performedAt, "Initial"),
+        draft("CELSIUS", Duration.ofHours(1)));
+  }
+
+  @Test
+  void theDueQueryWalksByKeysetEvenWhenSeveralSensorsExpireAtTheSameInstant() {
+    Asset asset = anAsset();
+    Instant sameExpiry =
+        Instant.now().minus(Duration.ofHours(5)).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    List<UUID> ours = new java.util.ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      ours.add(expired(asset, sameExpiry).id());
+    }
+    Sensor notDue =
+        sensors.register(
+            ADMIN,
+            asset.id(),
+            unique("SN"),
+            null,
+            "CELSIUS",
+            new InitialCalibration(
+                CalibrationKind.CALIBRATION, Instant.now().minusSeconds(10), "Fresh"),
+            draft("CELSIUS", Duration.ofDays(1)));
+    Sensor noCalibration =
+        sensors.register(ADMIN, asset.id(), unique("SN"), null, "CELSIUS", null, null);
+
+    List<UUID> walked = new java.util.ArrayList<>();
+    DueSensor after = null;
+    Instant now = Instant.now();
+    while (true) {
+      List<DueSensor> page = sensorRepository.findDueForCalibrationExpiry(now, after, 2);
+      page.forEach(d -> walked.add(d.sensorId()));
+      if (page.size() < 2) {
+        break;
+      }
+      after = page.get(page.size() - 1);
+    }
+
+    assertThat(walked).containsAll(ours).doesNotContain(notDue.id(), noCalibration.id());
+    assertThat(walked).doesNotHaveDuplicates();
+    // With one shared expiry the keyset order is the database's id order (unsigned bytes, which is
+    // not java.util.UUID's signed comparison).
+    List<UUID> expected =
+        jdbc.sql("SELECT id FROM sensor WHERE id = ANY (?) ORDER BY id")
+            .param(ours.toArray(UUID[]::new))
+            .query(UUID.class)
+            .list();
+    assertThat(walked.stream().filter(ours::contains).toList()).containsExactlyElementsOf(expected);
+  }
+
+  @Test
+  void theJobMovesEligibleSensorsAsTheSystemAndIsolatesAFailingOne() {
+    Asset asset = anAsset();
+    Instant longAgo = Instant.now().minus(Duration.ofHours(3));
+    Sensor active = expired(asset, longAgo);
+    Sensor inactive = expired(asset, longAgo.plusSeconds(1));
+    lifecycle.changeStatus(ADMIN, inactive.id(), SensorStatus.INACTIVE, "off");
+    Sensor valid =
+        sensors.register(
+            ADMIN,
+            asset.id(),
+            unique("SN"),
+            null,
+            "CELSIUS",
+            new InitialCalibration(
+                CalibrationKind.CALIBRATION, Instant.now().minusSeconds(10), "Fresh"),
+            draft("CELSIUS", Duration.ofDays(1)));
+    Sensor alreadyInMaintenance = expired(asset, longAgo.plusSeconds(2));
+    lifecycle.changeStatus(
+        ADMIN, alreadyInMaintenance.id(), SensorStatus.IN_MAINTENANCE, "inspect");
+    UUID inconsistent = UUID.randomUUID();
+    jdbc.sql(
+            """
+            INSERT INTO sensor
+              (id, serial_number, measurement_unit, asset_id, status, status_changed_at,
+               last_calibration_recorded_at, last_calibration_valid_until, created_at, updated_at,
+               version)
+            VALUES (?, ?, 'CELSIUS', ?, 'ACTIVE', now(), now(), now() - interval '1 hour', now(), now(), 1)
+            """)
+        .params(inconsistent, unique("SN"), asset.id())
+        .update();
+    long inconsistentEvents = outboxFor(inconsistent.toString());
+    long inconsistentAudit =
+        jdbc.sql("SELECT count(*) FROM sensor_lifecycle_audit WHERE sensor_id = ?")
+            .param(inconsistent)
+            .query(Long.class)
+            .single();
+
+    var result = expiry.run();
+
+    assertThat(result.transitioned()).isGreaterThanOrEqualTo(2);
+    assertThat(result.failed())
+        .as("the sensor without a calibration record failed")
+        .isGreaterThanOrEqualTo(1);
+    assertThat(sensors.get(ADMIN, active.id()).status()).isEqualTo(SensorStatus.IN_MAINTENANCE);
+    assertThat(sensors.get(ADMIN, inactive.id()).status()).isEqualTo(SensorStatus.IN_MAINTENANCE);
+    assertThat(sensors.get(ADMIN, valid.id()).status()).isEqualTo(SensorStatus.ACTIVE);
+    assertThat(sensors.get(ADMIN, alreadyInMaintenance.id()).version()).isEqualTo(2);
+    assertThat(
+            jdbc.sql("SELECT status FROM sensor WHERE id = ?")
+                .param(inconsistent)
+                .query(String.class)
+                .single())
+        .as("a failing sensor is rolled back on its own")
+        .isEqualTo("ACTIVE");
+    assertThat(outboxFor(inconsistent.toString())).isEqualTo(inconsistentEvents);
+    assertThat(
+            jdbc.sql("SELECT count(*) FROM sensor_lifecycle_audit WHERE sensor_id = ?")
+                .param(inconsistent)
+                .query(Long.class)
+                .single())
+        .isEqualTo(inconsistentAudit);
+
+    var audit =
+        jdbc.sql(
+                "SELECT action, actor_type, actor_id, reason, previous_value->>'status' AS previous, new_value->>'status' AS next"
+                    + " FROM sensor_lifecycle_audit WHERE sensor_id = ? AND actor_type = 'SYSTEM'")
+            .param(active.id())
+            .query()
+            .singleRow();
+    assertThat(audit)
+        .containsEntry("action", "STATUS_CHANGED")
+        .containsEntry("actor_id", "calibration-expiry-job")
+        .containsEntry("reason", "calibración/verificación vencida")
+        .containsEntry("previous", "ACTIVE")
+        .containsEntry("next", "IN_MAINTENANCE");
+    assertThat(
+            jdbc.sql(
+                    "SELECT event_type || ':' || aggregate_version FROM outbox_event WHERE aggregate_id = ? ORDER BY aggregate_version")
+                .param(active.id().toString())
+                .query(String.class)
+                .list())
+        .containsExactly(
+            "SensorCalibrationRecorded:1",
+            "OperationalProfileUpdated:2",
+            "SensorCalibrationExpired:3",
+            "SensorStatusChanged:4");
+    assertThat(
+            jdbc.sql(
+                    "SELECT (payload->'actor'->>'type') || '/' || (payload->'actor'->>'id') FROM outbox_event WHERE aggregate_id = ? AND event_type = 'SensorCalibrationExpired'")
+                .param(active.id().toString())
+                .query(String.class)
+                .single())
+        .isEqualTo("SYSTEM/calibration-expiry-job");
+
+    long events = outboxFor(active.id().toString());
+    expiry.run();
+    assertThat(outboxFor(active.id().toString()))
+        .as("a second run changes nothing")
+        .isEqualTo(events);
+    assertThat(sensors.get(ADMIN, active.id()).version()).isEqualTo(2);
   }
 }
