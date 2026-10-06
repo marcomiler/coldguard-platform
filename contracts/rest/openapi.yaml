@@ -438,11 +438,14 @@ paths:
       tags: [Telemetry]
       summary: Connectivity of the sensors
       description: |
-        Connectivity is independent of the lifecycle status. Until this route exists, the Gateway
-        resolves `connectivity` as a sensor id and answers `404`.
+        Connectivity is independent of the lifecycle status. Lists the sensors that have sent at
+        least one reading; a sensor that never reported has no entry. A sensor is flagged as lost
+        once it stays silent for its expected reading interval times a tolerance factor (an
+        academic placeholder, not a confirmed business value); the flag clears when a reading
+        arrives. Leaving service (maintenance, inactive, retired) also clears it, and a sensor
+        returning to `ACTIVE` gets a full interval before it can be flagged again.
       operationId: listConnectivity
-      x-status: planned
-      x-planned-in: SPEC-006
+      x-status: implemented
       x-roles: [PLATFORM_ADMIN, OPERATIONS_SUPERVISOR]
       parameters:
         - name: onlyLost

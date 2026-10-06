@@ -25,6 +25,7 @@ public record SensorCondition(
     int breachStreak,
     Instant breachStreakStartedAt,
     Instant connectivityLostAt,
+    Instant assetStateAt,
     long version) {
 
   /** The outcome of evaluating one reading. */
@@ -41,6 +42,7 @@ public record SensorCondition(
         null,
         null,
         0,
+        null,
         null,
         null,
         1);
@@ -62,6 +64,7 @@ public record SensorCondition(
         breachStreak,
         breachStreakStartedAt,
         null,
+        assetStateAt,
         version);
   }
 
@@ -107,6 +110,90 @@ public record SensorCondition(
         streak,
         startedAt,
         connectivityLostAt,
+        assetStateAt,
+        version);
+  }
+
+  /**
+   * True when a change announced by Asset at {@code at} is not newer than the last one applied, so
+   * applying it would undo a later state (events are not delivered in order).
+   */
+  public boolean staleChange(Instant at) {
+    return assetStateAt != null && !at.isAfter(assetStateAt);
+  }
+
+  /**
+   * Asset changed the sensor's status. Whatever the new status, the sensor starts a fresh
+   * connectivity watch: a sensor that is no longer ACTIVE is not monitored, and one that becomes
+   * ACTIVE again is given a full interval from the change instead of being judged by the readings
+   * it could not send while it was out of service.
+   */
+  public SensorCondition statusChanged(SensorStatus status, Instant at) {
+    Instant reference =
+        status == SensorStatus.ACTIVE && at.isAfter(lastReadingAt) ? at : lastReadingAt;
+    return new SensorCondition(
+        sensorId,
+        assetId,
+        status,
+        expectedIntervalSeconds,
+        reference,
+        lastEvaluatedRecordedAt,
+        breachAnomalyType,
+        breachStreak,
+        breachStreakStartedAt,
+        null,
+        at,
+        version);
+  }
+
+  /** Asset moved the sensor to another asset. */
+  public SensorCondition reassigned(UUID newAssetId, Instant at) {
+    return new SensorCondition(
+        sensorId,
+        newAssetId,
+        sensorStatus,
+        expectedIntervalSeconds,
+        lastReadingAt,
+        lastEvaluatedRecordedAt,
+        breachAnomalyType,
+        breachStreak,
+        breachStreakStartedAt,
+        connectivityLostAt,
+        at,
+        version);
+  }
+
+  /** The operational profile changed how often the sensor is expected to report. */
+  public SensorCondition intervalChanged(int seconds, Instant at) {
+    return new SensorCondition(
+        sensorId,
+        assetId,
+        sensorStatus,
+        seconds,
+        lastReadingAt,
+        lastEvaluatedRecordedAt,
+        breachAnomalyType,
+        breachStreak,
+        breachStreakStartedAt,
+        connectivityLostAt,
+        at,
+        version);
+  }
+
+  /** The sensor stopped reporting: flag it so the loss is announced once. */
+  public SensorCondition connectivityLost(Instant at) {
+    return new SensorCondition(
+        sensorId,
+        assetId,
+        sensorStatus,
+        expectedIntervalSeconds,
+        lastReadingAt,
+        lastEvaluatedRecordedAt,
+        breachAnomalyType,
+        breachStreak,
+        breachStreakStartedAt,
+        at,
+        assetStateAt,
         version);
   }
 

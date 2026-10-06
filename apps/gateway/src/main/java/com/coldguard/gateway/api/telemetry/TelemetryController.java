@@ -1,6 +1,7 @@
 package com.coldguard.gateway.api.telemetry;
 
 import com.coldguard.gateway.api.common.CursorPageResponse;
+import com.coldguard.gateway.api.common.PageResponse;
 import com.coldguard.gateway.infrastructure.TelemetryGrpcClient;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -47,5 +48,21 @@ class TelemetryController {
         reply.getReadingsList().stream().map(TelemetryRestMapper::toRest).toList(),
         reply.getPage().getNextCursor(),
         reply.getPage().getHasMore());
+  }
+
+  /**
+   * A literal route, so it takes precedence over {@code /sensors/{sensorId}} (which belongs to the
+   * Asset resource).
+   */
+  @GetMapping("/sensors/connectivity")
+  PageResponse<ConnectivityResponse> connectivity(
+      @RequestParam(defaultValue = "false") boolean onlyLost,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "0") int size) {
+    var reply =
+        telemetry.listConnectivityStatus(TelemetryRestMapper.connectivity(onlyLost, page, size));
+    return new PageResponse<>(
+        reply.getStatusesList().stream().map(TelemetryRestMapper::toRest).toList(),
+        TelemetryRestMapper.toRest(reply.getPage()));
   }
 }

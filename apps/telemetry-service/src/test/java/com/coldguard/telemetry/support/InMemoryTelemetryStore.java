@@ -7,6 +7,7 @@ import com.coldguard.telemetry.application.SensorContexts;
 import com.coldguard.telemetry.application.StoredReading;
 import com.coldguard.telemetry.domain.SensorCondition;
 import com.coldguard.telemetry.domain.SensorContext;
+import com.coldguard.telemetry.domain.SensorStatus;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,6 +17,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -103,6 +105,44 @@ public class InMemoryTelemetryStore {
         @Override
         public void save(SensorCondition condition) {
           conditions.put(condition.sensorId(), condition);
+        }
+
+        @Override
+        public Optional<SensorCondition> lockExisting(UUID sensorId) {
+          return Optional.ofNullable(conditions.get(sensorId));
+        }
+
+        @Override
+        public List<SensorCondition> lockOverdue(Instant now, double toleranceFactor, int limit) {
+          return conditions.values().stream()
+              .filter(c -> c.connectivityLostAt() == null)
+              .filter(c -> c.sensorStatus() == SensorStatus.ACTIVE)
+              .filter(c -> c.expectedIntervalSeconds() > 0)
+              .filter(
+                  c ->
+                      c.lastReadingAt()
+                          .plusMillis((long) (c.expectedIntervalSeconds() * toleranceFactor * 1000))
+                          .isBefore(now))
+              .sorted(Comparator.comparing(SensorCondition::lastReadingAt))
+              .limit(limit)
+              .toList();
+        }
+
+        @Override
+        public List<SensorCondition> findPage(boolean onlyLost, int page, int size) {
+          return conditions.values().stream()
+              .filter(c -> !onlyLost || c.connectivityLostAt() != null)
+              .sorted(Comparator.comparing(SensorCondition::sensorId))
+              .skip((long) page * size)
+              .limit(size)
+              .toList();
+        }
+
+        @Override
+        public long count(boolean onlyLost) {
+          return conditions.values().stream()
+              .filter(c -> !onlyLost || c.connectivityLostAt() != null)
+              .count();
         }
       };
 }

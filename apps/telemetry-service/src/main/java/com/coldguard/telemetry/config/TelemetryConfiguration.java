@@ -2,6 +2,10 @@ package com.coldguard.telemetry.config;
 
 import com.coldguard.asset.grpc.v1.AssetServiceGrpc;
 import com.coldguard.commons.messaging.outbox.DomainEventPublisher;
+import com.coldguard.telemetry.application.AssetChangeHandler;
+import com.coldguard.telemetry.application.ConnectivityMetrics;
+import com.coldguard.telemetry.application.ConnectivityMonitor;
+import com.coldguard.telemetry.application.ConnectivityQueryService;
 import com.coldguard.telemetry.application.IngestMetrics;
 import com.coldguard.telemetry.application.IngestReadingsService;
 import com.coldguard.telemetry.application.IngestSettings;
@@ -43,8 +47,40 @@ class TelemetryConfiguration {
   }
 
   @Bean
-  IngestMetrics ingestMetrics(MeterRegistry meters) {
+  MicrometerIngestMetrics telemetryMetrics(MeterRegistry meters) {
     return new MicrometerIngestMetrics(meters);
+  }
+
+  @Bean
+  AssetChangeHandler assetChangeHandler(
+      SensorConditionRepository conditions, CachedSensorContexts contexts) {
+    return new AssetChangeHandler(conditions, contexts);
+  }
+
+  @Bean
+  ConnectivityMonitor connectivityMonitor(
+      SensorConditionRepository conditions,
+      DomainEventPublisher events,
+      ConnectivityMetrics metrics,
+      Clock clock,
+      PlatformTransactionManager transactionManager,
+      TelemetryProperties properties) {
+    var connectivity = properties.connectivity();
+    return new ConnectivityMonitor(
+        conditions,
+        events,
+        metrics,
+        clock,
+        transactionManager,
+        connectivity.toleranceFactor(),
+        connectivity.batchSize());
+  }
+
+  @Bean
+  ConnectivityQueryService connectivityQueryService(
+      SensorConditionRepository conditions, TelemetryProperties properties) {
+    return new ConnectivityQueryService(
+        conditions, properties.page().maxSize(), properties.page().defaultSize());
   }
 
   @Bean

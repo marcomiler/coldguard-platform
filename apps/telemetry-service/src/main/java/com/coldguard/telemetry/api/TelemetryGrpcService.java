@@ -2,11 +2,14 @@ package com.coldguard.telemetry.api;
 
 import com.coldguard.commons.security.Actor;
 import com.coldguard.commons.security.ActorServerInterceptor;
+import com.coldguard.telemetry.application.ConnectivityQueryService;
 import com.coldguard.telemetry.application.IncomingReading;
 import com.coldguard.telemetry.application.IngestReadingsService;
 import com.coldguard.telemetry.application.ReadingQueryService;
 import com.coldguard.telemetry.grpc.v1.IngestReadingsRequest;
 import com.coldguard.telemetry.grpc.v1.IngestReadingsResponse;
+import com.coldguard.telemetry.grpc.v1.ListConnectivityStatusRequest;
+import com.coldguard.telemetry.grpc.v1.ListConnectivityStatusResponse;
 import com.coldguard.telemetry.grpc.v1.ListReadingsRequest;
 import com.coldguard.telemetry.grpc.v1.ListReadingsResponse;
 import com.coldguard.telemetry.grpc.v1.TelemetryServiceGrpc;
@@ -18,18 +21,22 @@ import org.springframework.grpc.server.service.GrpcService;
 
 /**
  * gRPC endpoint of Telemetry (contracts/grpc/telemetry/v1). It translates and delegates; business
- * errors propagate as exceptions and {@link TelemetryGrpcExceptionHandler} maps them. Connectivity
- * status is not served yet and keeps the default UNIMPLEMENTED answer.
+ * errors propagate as exceptions and {@link TelemetryGrpcExceptionHandler} maps them.
  */
 @GrpcService
 public class TelemetryGrpcService extends TelemetryServiceGrpc.TelemetryServiceImplBase {
 
   private final IngestReadingsService ingestion;
   private final ReadingQueryService queries;
+  private final ConnectivityQueryService connectivity;
 
-  public TelemetryGrpcService(IngestReadingsService ingestion, ReadingQueryService queries) {
+  public TelemetryGrpcService(
+      IngestReadingsService ingestion,
+      ReadingQueryService queries,
+      ConnectivityQueryService connectivity) {
     this.ingestion = ingestion;
     this.queries = queries;
+    this.connectivity = connectivity;
   }
 
   private static Actor actor() {
@@ -83,6 +90,29 @@ public class TelemetryGrpcService extends TelemetryServiceGrpc.TelemetryServiceI
                     .setNextCursor(page.nextCursor())
                     .setHasMore(page.hasMore()));
     page.readings().forEach(reading -> reply.addReadings(TelemetryGrpcMapper.toGrpc(reading)));
+    observer.onNext(reply.build());
+    observer.onCompleted();
+  }
+
+  @Override
+  public void listConnectivityStatus(
+      ListConnectivityStatusRequest request,
+      StreamObserver<ListConnectivityStatusResponse> observer) {
+    var page =
+        connectivity.list(
+            actor(),
+            request.getOnlyLost(),
+            request.getPage().getPage(),
+            request.getPage().getSize());
+    ListConnectivityStatusResponse.Builder reply =
+        ListConnectivityStatusResponse.newBuilder()
+            .setPage(
+                com.coldguard.common.grpc.v1.PageInfo.newBuilder()
+                    .setPage(page.page())
+                    .setSize(page.size())
+                    .setTotalElements(page.totalElements())
+                    .setTotalPages(page.totalPages()));
+    page.items().forEach(condition -> reply.addStatuses(TelemetryGrpcMapper.toGrpc(condition)));
     observer.onNext(reply.build());
     observer.onCompleted();
   }

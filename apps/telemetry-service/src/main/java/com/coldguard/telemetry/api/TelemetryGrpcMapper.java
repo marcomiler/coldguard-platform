@@ -5,6 +5,8 @@ import com.coldguard.telemetry.application.ReadingResult;
 import com.coldguard.telemetry.application.StoredReading;
 import com.coldguard.telemetry.domain.MagnitudeLevel;
 import com.coldguard.telemetry.domain.ReadingSource;
+import com.coldguard.telemetry.domain.SensorCondition;
+import com.google.protobuf.Duration;
 import com.google.protobuf.Timestamp;
 import java.time.Instant;
 
@@ -83,6 +85,20 @@ final class TelemetryGrpcMapper {
       case HIGH -> com.coldguard.telemetry.grpc.v1.MagnitudeLevel.MAGNITUDE_LEVEL_HIGH;
       case CRITICAL -> com.coldguard.telemetry.grpc.v1.MagnitudeLevel.MAGNITUDE_LEVEL_CRITICAL;
     };
+  }
+
+  static com.coldguard.telemetry.grpc.v1.ConnectivityStatus toGrpc(SensorCondition condition) {
+    var status =
+        com.coldguard.telemetry.grpc.v1.ConnectivityStatus.newBuilder()
+            .setSensorId(condition.sensorId().toString())
+            .setAssetId(condition.assetId().toString())
+            .setLastReadingAt(timestamp(condition.lastReadingAt()))
+            .setExpectedReadingInterval(
+                Duration.newBuilder().setSeconds(condition.expectedIntervalSeconds()));
+    if (condition.connectivityLostAt() != null) {
+      status.setConnectivityLostAt(timestamp(condition.connectivityLostAt()));
+    }
+    return status.build();
   }
 
   private static Timestamp timestamp(Instant instant) {

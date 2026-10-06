@@ -88,6 +88,13 @@ coldguard:
       ttl: 60s
       max-size: 10000
     asset-call-deadline: 2s
+    connectivity:
+      enabled: true
+      # Academic placeholders, not confirmed by the business: a sensor is flagged once
+      # expected interval x tolerance-factor has passed without a reading.
+      check-interval: ${TELEMETRY_CONNECTIVITY_CHECK_INTERVAL:30s}
+      tolerance-factor: 1.5
+      batch-size: 100
     readings-query:
       max-range: 7d
     page:

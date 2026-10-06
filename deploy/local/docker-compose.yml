@@ -122,6 +122,8 @@ services:
       # Asset Service address; its certificate SAN is asset-service.
       ASSET_SERVICE_HOST: asset-service
       ASSET_SERVICE_GRPC_PORT: 9091
+      # How often silent sensors are looked for (an academic placeholder).
+      TELEMETRY_CONNECTIVITY_CHECK_INTERVAL: ${TELEMETRY_CONNECTIVITY_CHECK_INTERVAL:-30s}
     volumes:
       - ./certs:/certs:ro
     healthcheck:

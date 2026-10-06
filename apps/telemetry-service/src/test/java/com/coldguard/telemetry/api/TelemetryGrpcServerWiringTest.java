@@ -3,10 +3,12 @@ package com.coldguard.telemetry.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.coldguard.common.grpc.v1.PageRequest;
 import com.coldguard.commons.security.Actor;
 import com.coldguard.commons.security.ActorServerInterceptor;
 import com.coldguard.commons.security.Role;
 import com.coldguard.telemetry.application.AssetUnavailableException;
+import com.coldguard.telemetry.application.ConnectivityQueryService;
 import com.coldguard.telemetry.application.IngestReadingsService;
 import com.coldguard.telemetry.application.IngestSettings;
 import com.coldguard.telemetry.application.ReadingQueryService;
@@ -97,7 +99,8 @@ class TelemetryGrpcServerWiringTest {
                 new IngestSettings(3, Duration.ofSeconds(30)),
                 clock,
                 new NoOpTransactionManager()),
-            new ReadingQueryService(store.readingRepository, Duration.ofDays(7), 100, 20));
+            new ReadingQueryService(store.readingRepository, Duration.ofDays(7), 100, 20),
+            new ConnectivityQueryService(store.conditionRepository, 100, 20));
     String name = "telemetry-wiring-" + UUID.randomUUID();
     server =
         InProcessServerBuilder.forName(name)
@@ -373,13 +376,79 @@ class TelemetryGrpcServerWiringTest {
         null);
   }
 
+  private void ingestOne() {
+    stub.ingestReadings(
+        IngestReadingsRequest.newBuilder()
+            .setSource(ReadingSource.READING_SOURCE_SIMULATOR)
+            .addReadings(reading(5.0, 1))
+            .build());
+  }
+
   @Test
-  void connectivityStatusIsNotServedYet() {
-    caller.set(ADMIN);
+  void connectivityStatusListsTheSensorsThatReportedAndMarksTheSilentOnes() {
+    ingestOne();
+    caller.set(SUPERVISOR);
+
+    var all = stub.listConnectivityStatus(ListConnectivityStatusRequest.getDefaultInstance());
+
+    assertThat(all.getStatusesList()).hasSize(1);
+    var status = all.getStatuses(0);
+    assertThat(status.getSensorId()).isEqualTo(sensor.sensorId().toString());
+    assertThat(status.getAssetId()).isEqualTo(sensor.assetId().toString());
+    assertThat(status.getExpectedReadingInterval().getSeconds()).isEqualTo(5);
+    assertThat(status.hasLastReadingAt()).isTrue();
+    assertThat(status.hasConnectivityLostAt()).isFalse();
+    assertThat(all.getPage().getTotalElements()).isEqualTo(1);
+    assertThat(all.getPage().getSize()).isEqualTo(20);
+
+    var lost =
+        stub.listConnectivityStatus(
+            ListConnectivityStatusRequest.newBuilder().setOnlyLost(true).build());
+    assertThat(lost.getStatusesList()).isEmpty();
+
+    store.conditions.computeIfPresent(
+        sensor.sensorId(), (id, c) -> c.connectivityLost(Instant.now()));
+    var afterLoss =
+        stub.listConnectivityStatus(
+            ListConnectivityStatusRequest.newBuilder().setOnlyLost(true).build());
+    assertThat(afterLoss.getStatusesList()).hasSize(1);
+    assertThat(afterLoss.getStatuses(0).hasConnectivityLostAt()).isTrue();
+  }
+
+  @Test
+  void connectivityStatusIsRestrictedToAdministratorsAndSupervisors() {
+    ingestOne();
 
     assertFails(
         () -> stub.listConnectivityStatus(ListConnectivityStatusRequest.getDefaultInstance()),
-        Status.Code.UNIMPLEMENTED,
+        Status.Code.PERMISSION_DENIED,
+        null);
+    caller.set(ADMIN);
+    assertThat(
+            stub.listConnectivityStatus(ListConnectivityStatusRequest.getDefaultInstance())
+                .getStatusesList())
+        .hasSize(1);
+  }
+
+  @Test
+  void connectivityStatusRejectsAnOversizedOrNegativePage() {
+    caller.set(ADMIN);
+
+    assertFails(
+        () ->
+            stub.listConnectivityStatus(
+                ListConnectivityStatusRequest.newBuilder()
+                    .setPage(PageRequest.newBuilder().setSize(101))
+                    .build()),
+        Status.Code.INVALID_ARGUMENT,
+        null);
+    assertFails(
+        () ->
+            stub.listConnectivityStatus(
+                ListConnectivityStatusRequest.newBuilder()
+                    .setPage(PageRequest.newBuilder().setPage(-1).setSize(10))
+                    .build()),
+        Status.Code.INVALID_ARGUMENT,
         null);
   }
 }

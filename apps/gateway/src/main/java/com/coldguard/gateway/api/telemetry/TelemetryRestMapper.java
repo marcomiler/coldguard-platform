@@ -1,6 +1,8 @@
 package com.coldguard.gateway.api.telemetry;
 
+import com.coldguard.gateway.api.common.PageResponse;
 import com.coldguard.telemetry.grpc.v1.IngestReadingsRequest;
+import com.coldguard.telemetry.grpc.v1.ListConnectivityStatusRequest;
 import com.coldguard.telemetry.grpc.v1.ListReadingsRequest;
 import com.google.protobuf.Timestamp;
 import java.time.Instant;
@@ -49,6 +51,27 @@ final class TelemetryRestMapper {
                 .setCursor(cursor == null ? "" : cursor)
                 .setSize(size))
         .build();
+  }
+
+  static ListConnectivityStatusRequest connectivity(boolean onlyLost, int page, int size) {
+    return ListConnectivityStatusRequest.newBuilder()
+        .setOnlyLost(onlyLost)
+        .setPage(com.coldguard.common.grpc.v1.PageRequest.newBuilder().setPage(page).setSize(size))
+        .build();
+  }
+
+  static ConnectivityResponse toRest(com.coldguard.telemetry.grpc.v1.ConnectivityStatus status) {
+    return new ConnectivityResponse(
+        status.getSensorId(),
+        status.getAssetId(),
+        status.hasLastReadingAt() ? instant(status.getLastReadingAt()) : null,
+        status.getExpectedReadingInterval().getSeconds(),
+        status.hasConnectivityLostAt() ? instant(status.getConnectivityLostAt()) : null);
+  }
+
+  static PageResponse.PageInfo toRest(com.coldguard.common.grpc.v1.PageInfo page) {
+    return new PageResponse.PageInfo(
+        page.getPage(), page.getSize(), page.getTotalElements(), page.getTotalPages());
   }
 
   static ReadingResult toRest(com.coldguard.telemetry.grpc.v1.ReadingResult result) {

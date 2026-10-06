@@ -3,6 +3,8 @@ package com.coldguard.gateway.infrastructure;
 import com.coldguard.gateway.config.DownstreamProperties;
 import com.coldguard.telemetry.grpc.v1.IngestReadingsRequest;
 import com.coldguard.telemetry.grpc.v1.IngestReadingsResponse;
+import com.coldguard.telemetry.grpc.v1.ListConnectivityStatusRequest;
+import com.coldguard.telemetry.grpc.v1.ListConnectivityStatusResponse;
 import com.coldguard.telemetry.grpc.v1.ListReadingsRequest;
 import com.coldguard.telemetry.grpc.v1.ListReadingsResponse;
 import com.coldguard.telemetry.grpc.v1.TelemetryServiceGrpc;
@@ -42,5 +44,10 @@ public class TelemetryGrpcClient {
 
   public ListReadingsResponse listReadings(ListReadingsRequest request) {
     return call(s -> s.listReadings(request));
+  }
+
+  public ListConnectivityStatusResponse listConnectivityStatus(
+      ListConnectivityStatusRequest request) {
+    return call(s -> s.listConnectivityStatus(request));
   }
 }
