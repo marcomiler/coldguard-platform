@@ -28,6 +28,7 @@ informal por superficie de ataque; no es un análisis STRIDE exhaustivo.
 | Acceder a una ruta sin el rol | Deny-by-default; `RbacPolicyTest` recorre cada fila | Una ruta nueva no declarada queda cerrada, no abierta |
 | Suplantar a un usuario llamando directo a un servicio interno con `x-actor-*` | El servicio acepta esa metadata solo del certificado `gateway`; el resto se ignora | Un compromiso del Gateway o de su clave mTLS permite suplantar a cualquiera |
 | Llamar a un servicio interno sin certificado | Rechazo en el handshake mTLS | Los certificados de desarrollo los emite una CA local |
+| Un servicio interno se hace pasar por Telemetry, o el Gateway por un actor `system:` | El actor de sistema sale del CN del certificado y de una lista configurada; el Gateway no puede propagar `system:`; un actor de sistema no tiene roles | Un compromiso de la clave mTLS de Telemetry permite leer contextos de evaluación (solo lectura) |
 | Escalar privilegios con un rol desconocido en `x-actor-roles` | Los nombres que no están en el enum de roles no conceden nada | — |
 | Fuga de secretos por logs | `LogSecretsTest`; el login y el interceptor nunca registran contraseña ni token | Cubre los flujos probados; código nuevo debe añadir su caso |
 | Abuso de CORS desde otro origen | Lista explícita, sin `*` y sin credenciales | Depende de configurar bien la variable de entorno |

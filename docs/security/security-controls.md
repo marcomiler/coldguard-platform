@@ -11,6 +11,7 @@ existe código y pruebas; lo previsto pero ausente figura como pendiente.
 | Bloqueo por intentos fallidos | Implementado | Identity & Access; `IdentityPersistenceIntegrationTest` |
 | Contraseñas con hash adaptativo | Implementado | `DelegatingPasswordEncoder` + BCrypt (`spring-security-crypto`) |
 | RBAC deny-by-default en el Gateway | Implementado | `SecurityConfig`; `RbacPolicyTest` recorre cada fila de `authn-authz.md` |
+| Llamadores de sistema reconocidos solo por certificado y lista configurada | Implementado | `ActorServerInterceptor`; pruebas unitarias y con handshake mTLS real (`ActorServerInterceptorTlsTest`); Asset: `GetSensorEvaluationContext(s)` solo para `telemetry-service` |
 | Propagación de identidad solo desde el Gateway | Implementado | `ActorMetadataClientInterceptor`, `ActorServerInterceptor`; `ActorServerInterceptorTlsTest` (handshake mTLS real) |
 | mTLS entre Gateway y servicios internos | Implementado | `MutualTlsHandshakeTest`; CA local de `deploy/scripts/generate-dev-certs.sh` |
 | Defensa en profundidad por rol en `application` | Parcial | Solo `CloseIncidentService` (RN-019) |

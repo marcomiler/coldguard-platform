@@ -3,8 +3,11 @@ package com.coldguard.asset.support;
 import com.coldguard.asset.application.AssetRepository;
 import com.coldguard.asset.application.AssignmentEntry;
 import com.coldguard.asset.application.CalibrationRepository;
+import com.coldguard.asset.application.EvaluationContextRepository;
+import com.coldguard.asset.application.HistoryCursor;
 import com.coldguard.asset.application.OperationalProfileRepository;
 import com.coldguard.asset.application.OrganizationRepository;
+import com.coldguard.asset.application.SensorEvaluationContext;
 import com.coldguard.asset.application.SensorHistoryEntry;
 import com.coldguard.asset.application.SensorHistoryRepository;
 import com.coldguard.asset.application.SensorRepository;
@@ -56,7 +59,40 @@ public class InMemoryAssetStore {
         public void addEntry(SensorHistoryEntry entry) {
           history.add(entry);
         }
+
+        @Override
+        public List<SensorHistoryEntry> findPage(UUID sensorId, HistoryCursor cursor, int limit) {
+          return history.stream()
+              .filter(e -> e.sensorId().equals(sensorId))
+              .filter(
+                  e ->
+                      cursor == null
+                          || e.occurredAt().isBefore(cursor.occurredAt())
+                          || (e.occurredAt().equals(cursor.occurredAt())
+                              && e.id().compareTo(cursor.id()) < 0))
+              .sorted(
+                  Comparator.comparing(SensorHistoryEntry::occurredAt)
+                      .thenComparing(SensorHistoryEntry::id)
+                      .reversed())
+              .limit(limit)
+              .toList();
+        }
       };
+
+  public final EvaluationContextRepository evaluationContextRepository =
+      ids ->
+          ids.stream()
+              .map(sensors::get)
+              .filter(java.util.Objects::nonNull)
+              .map(
+                  sensor ->
+                      new SensorEvaluationContext(
+                          sensor.id(),
+                          sensor.assetId(),
+                          assets.get(sensor.assetId()).criticality(),
+                          sensor.status(),
+                          profiles.get(sensor.id())))
+              .toList();
 
   private final class Organizations implements OrganizationRepository {
     @Override

@@ -3,7 +3,6 @@ package com.coldguard.asset.infrastructure;
 import com.coldguard.asset.application.OperationalProfileRepository;
 import com.coldguard.asset.domain.OperationalProfile;
 import com.coldguard.asset.domain.StaleVersionException;
-import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
@@ -14,14 +13,9 @@ import org.springframework.stereotype.Repository;
 class JdbcOperationalProfileRepository implements OperationalProfileRepository {
 
   private static final String SELECT =
-      """
-      SELECT sensor_id, min_temperature, max_temperature, unit, magnitude_medium_from,
-             magnitude_high_from, magnitude_critical_from, persistence_min_consecutive,
-             persistence_window_seconds, expected_interval_seconds, calibration_validity_seconds,
-             updated_at, updated_by, version
-        FROM operational_profile
-       WHERE sensor_id = ?
-      """;
+      "SELECT "
+          + ProfileRows.columns("operational_profile", "")
+          + " FROM operational_profile WHERE sensor_id = ?";
 
   private final JdbcClient jdbc;
 
@@ -98,22 +92,6 @@ class JdbcOperationalProfileRepository implements OperationalProfileRepository {
   }
 
   private OperationalProfile map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
-    long validity = rs.getLong("calibration_validity_seconds");
-    boolean noValidity = rs.wasNull();
-    return new OperationalProfile(
-        rs.getObject("sensor_id", UUID.class),
-        rs.getBigDecimal("min_temperature"),
-        rs.getBigDecimal("max_temperature"),
-        rs.getString("unit"),
-        rs.getBigDecimal("magnitude_medium_from"),
-        rs.getBigDecimal("magnitude_high_from"),
-        rs.getBigDecimal("magnitude_critical_from"),
-        rs.getInt("persistence_min_consecutive"),
-        Duration.ofSeconds(rs.getInt("persistence_window_seconds")),
-        Duration.ofSeconds(rs.getInt("expected_interval_seconds")),
-        noValidity ? null : Duration.ofSeconds(validity),
-        JdbcSupport.instant(rs, "updated_at"),
-        rs.getString("updated_by"),
-        rs.getLong("version"));
+    return ProfileRows.read(rs, "");
   }
 }

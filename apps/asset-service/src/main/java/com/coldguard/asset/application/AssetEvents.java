@@ -3,6 +3,7 @@ package com.coldguard.asset.application;
 import com.coldguard.asset.domain.Asset;
 import com.coldguard.asset.domain.CalibrationRecord;
 import com.coldguard.asset.domain.OperationalProfile;
+import com.coldguard.asset.domain.Sensor;
 import com.coldguard.commons.messaging.EventActor;
 import com.coldguard.commons.messaging.outbox.OutboundEvent;
 import java.time.Instant;
@@ -40,6 +41,13 @@ final class AssetEvents {
       Instant performedAt,
       Instant validUntil,
       String reason) {}
+
+  record SensorStatusChanged(
+      UUID sensorId, UUID assetId, String previousStatus, String newStatus, String reason) {}
+
+  record SensorReassigned(UUID sensorId, UUID previousAssetId, UUID newAssetId, String reason) {}
+
+  record SensorRetired(UUID sensorId, UUID assetId, String previousStatus, String reason) {}
 
   static OutboundEvent assetRegistered(Asset asset, EventActor actor, Instant now) {
     return new OutboundEvent(
@@ -104,6 +112,46 @@ final class AssetEvents {
             record.performedAt(),
             record.validUntil(),
             record.reason()));
+  }
+
+  static OutboundEvent sensorStatusChanged(
+      Sensor before, Sensor after, String reason, EventActor actor, Instant now) {
+    return new OutboundEvent(
+        "SensorStatusChanged",
+        1,
+        SENSOR,
+        after.id().toString(),
+        "asset.sensor-status-changed",
+        actor,
+        now,
+        new SensorStatusChanged(
+            after.id(), after.assetId(), before.status().name(), after.status().name(), reason));
+  }
+
+  static OutboundEvent sensorRetired(
+      Sensor before, Sensor after, String reason, EventActor actor, Instant now) {
+    return new OutboundEvent(
+        "SensorRetired",
+        1,
+        SENSOR,
+        after.id().toString(),
+        "asset.sensor-retired",
+        actor,
+        now,
+        new SensorRetired(after.id(), after.assetId(), before.status().name(), reason));
+  }
+
+  static OutboundEvent sensorReassigned(
+      Sensor before, Sensor after, String reason, EventActor actor, Instant now) {
+    return new OutboundEvent(
+        "SensorReassigned",
+        1,
+        SENSOR,
+        after.id().toString(),
+        "asset.sensor-reassigned",
+        actor,
+        now,
+        new SensorReassigned(after.id(), before.assetId(), after.assetId(), reason));
   }
 
   private static Map<String, Object> values(Asset asset, List<String> fields) {

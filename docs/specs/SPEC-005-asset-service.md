@@ -299,9 +299,59 @@ resolverse con los consumidores de SPEC-007; hasta entonces los eventos de Asset
 tras `max-attempts`, quedan aparcados.
 
 Pendiente:
-- Entrega 2: máquina de estados del sensor, `ChangeSensorStatus`, `RecordCalibration`,
-  `ReassignSensor`, `RetireSensor`, `GetSensorHistory` y `GetSensorEvaluationContext(s)`.
+- ~~Entrega 2~~: hecha, ver abajo.
 - Entrega 3: tarea programada de vencimiento de calibración.
 - Entrega 4: rutas del Gateway (canal gRPC `asset-service`), y actualizar `component-diagram.md`.
 - Los tests de arranque dependen de los certificados de desarrollo locales
   (`deploy/scripts/generate-dev-certs.sh`), igual que los de incident-service.
+
+### Entrega 2 — Ciclo de vida del sensor, historial y contexto de evaluación (2026-10-06)
+
+Hecho:
+- **Máquina de estados** en `Sensor` (`changeStatus`, `reassignTo`, `withCalibration`), con los
+  guards de RN-017 y RN-018: RETIRED es terminal; un cambio al mismo estado se rechaza; a ACTIVE
+  desde IN_MAINTENANCE exige una calibración registrada **después** de entrar y aún vigente
+  (`CALIBRATION_EVIDENCE_REQUIRED` / `CALIBRATION_EXPIRED`); desde INACTIVE basta una vigente, sin
+  registro nuevo; reasignar solo en IN_MAINTENANCE y a otro activo (`REASSIGNMENT_NOT_ALLOWED`).
+  Registrar una calibración nunca cambia el estado.
+- **Casos de uso** (`SensorLifecycleService`): `changeStatus`, `retire` (mismo camino que cambiar a
+  RETIRED), `recordCalibration` (caducidad derivada: validez del perfil o valor por defecto) y
+  `reassign`. Todos exigen `PLATFORM_ADMIN` y un motivo, y dejan en la misma transacción una
+  entrada de historial (quién, cuándo, por qué, anterior/posterior) y sus eventos:
+  `SensorStatusChanged`, `SensorRetired` + `SensorStatusChanged`, `SensorCalibrationRecorded`,
+  `SensorReassigned`.
+- **Historial** (`GetSensorHistory`): solo `PLATFORM_ADMIN`, del más reciente al más antiguo,
+  paginado por cursor `(occurred_at, id)` opaco; el historial de un sensor retirado sigue siendo
+  consultable y no existe forma de borrarlo.
+- **Contexto de evaluación** (`GetSensorEvaluationContext(s)`): una sola consulta
+  sensor ⋈ activo ⋈ perfil; el lote tiene un máximo configurable (500, placeholder de DEC-022) y
+  omite los sensores que no existen. Solo para llamadores de sistema.
+- **Llamadores de sistema** en `coldguard-commons`: el interceptor reconoce como actor
+  `system:<cn>` a los pares cuyo CN figura en `coldguard.security.system-callers` (Asset:
+  `telemetry-service`); el Gateway nunca puede propagar un actor `system:`; un actor de sistema no
+  tiene roles. Documentado en `docs/security/`.
+- Todos los RPC de `AssetService` están implementados.
+
+Decisiones tomadas en la implementación:
+- Operar sobre un sensor RETIRED (calibrar, reasignar, cambiar estado) se rechaza con los códigos
+  de transición/reasignación ya definidos; no se añadió un código nuevo.
+- `INACTIVE → ACTIVE` sin ninguna calibración registrada se rechaza como `CALIBRATION_EXPIRED`
+  (DEC-022 exige evidencia vigente para volver a ACTIVO).
+- Un lote de contexto con ids que no son UUID los omite, igual que a los inexistentes.
+- Las entradas de historial escritas por una misma operación comparten el instante (el alta deja
+  `REGISTERED`, `CALIBRATION_RECORDED` y `PROFILE_UPDATED` a la vez); entre ellas el orden lo
+  fija el `id`, estable entre páginas pero sin significado cronológico.
+
+Verificación: 139 tests en asset-service (la tabla completa de los 16 pares de estados, los
+escenarios de evidencia de RN-018 con reloj controlado, historial por cursor, contexto de
+evaluación, cableado gRPC con códigos de negocio, e integración contra PostgreSQL y RabbitMQ
+reales). Entre ellos: la secuencia de 9 eventos de un ciclo completo con `aggregate_version`
+1..9, el cursor sobre filas reales con empates (tres entradas del alta en el mismo instante) y una
+carrera entre dos cambios de estado simultáneos que deja exactamente uno aplicado. En Compose, el
+ciclo completo por gRPC con el certificado `gateway`; el contexto lo lee `telemetry-service`, y lo
+rechazan el Gateway con un administrador, el Gateway haciéndose pasar por `system:telemetry-service`,
+`telemetry-service` intentando cambiar un estado y `sensor-simulator`.
+
+Pendiente: entrega 3 (tarea programada de vencimiento, que ejecutará la transición con
+`Actor.system("calibration-expiry-job")` y publicará `SensorCalibrationExpired`) y entrega 4
+(rutas del Gateway y `component-diagram.md`).

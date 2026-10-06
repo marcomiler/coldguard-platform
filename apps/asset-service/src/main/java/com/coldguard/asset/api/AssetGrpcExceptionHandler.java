@@ -3,6 +3,7 @@ package com.coldguard.asset.api;
 import com.coldguard.asset.application.AssetAccessDeniedException;
 import com.coldguard.asset.application.CalibrationValidityNotConfiguredException;
 import com.coldguard.asset.domain.AlreadyExistsException;
+import com.coldguard.asset.domain.BusinessRuleViolationException;
 import com.coldguard.asset.domain.ResourceNotFoundException;
 import com.coldguard.asset.domain.StaleVersionException;
 import io.grpc.Metadata;
@@ -36,6 +37,8 @@ public class AssetGrpcExceptionHandler implements GrpcExceptionHandler {
           coded(Status.ALREADY_EXISTS, exists.getMessage(), exists.code());
       case StaleVersionException stale ->
           coded(Status.ABORTED, stale.getMessage(), "CONCURRENT_MODIFICATION");
+      case BusinessRuleViolationException violation ->
+          coded(Status.FAILED_PRECONDITION, violation.getMessage(), violation.code());
       case CalibrationValidityNotConfiguredException unconfigured ->
           coded(
               Status.FAILED_PRECONDITION,

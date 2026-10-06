@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coldguard.asset.application.AssetCatalogService;
+import com.coldguard.asset.application.EvaluationContextService;
 import com.coldguard.asset.application.OperationalProfileDraft;
 import com.coldguard.asset.application.OperationalProfileService;
+import com.coldguard.asset.application.SensorHistoryService;
+import com.coldguard.asset.application.SensorLifecycleService;
 import com.coldguard.asset.application.SensorService;
 import com.coldguard.asset.application.SensorService.InitialCalibration;
 import com.coldguard.asset.domain.AlreadyExistsException;
@@ -73,6 +76,9 @@ class AssetPersistenceIntegrationTest {
   @Autowired AssetCatalogService catalog;
   @Autowired SensorService sensors;
   @Autowired OperationalProfileService profiles;
+  @Autowired SensorLifecycleService lifecycle;
+  @Autowired SensorHistoryService history;
+  @Autowired EvaluationContextService contexts;
   @Autowired JdbcClient jdbc;
 
   private static String unique(String prefix) {
@@ -366,5 +372,233 @@ class AssetPersistenceIntegrationTest {
 
     assertThat(same.version()).isEqualTo(1);
     assertThat(outboxFor(asset.id().toString())).isEqualTo(before);
+  }
+
+  // ---- lifecycle -------------------------------------------------------------------------
+
+  private static void pause() throws InterruptedException {
+    Thread.sleep(15);
+  }
+
+  private Sensor registered(Asset asset) {
+    return sensors.register(
+        ADMIN,
+        asset.id(),
+        unique("SN"),
+        null,
+        "CELSIUS",
+        new InitialCalibration(
+            CalibrationKind.CALIBRATION, Instant.now().minusSeconds(30), "Factory"),
+        draft("CELSIUS", null));
+  }
+
+  @Test
+  void aFullLifecycleIsStoredWithItsHistoryAndAnOrderedEventStream() throws Exception {
+    Asset first = anAsset();
+    Asset second = anAsset();
+    Sensor sensor = registered(first);
+
+    pause();
+    lifecycle.changeStatus(ADMIN, sensor.id(), SensorStatus.IN_MAINTENANCE, "drifting");
+    pause();
+    lifecycle.recordCalibration(
+        ADMIN,
+        sensor.id(),
+        CalibrationKind.CALIBRATION,
+        Instant.now().minusSeconds(5),
+        "Recalibrated");
+    assertThat(sensors.get(ADMIN, sensor.id()).status())
+        .as("a calibration alone does not reactivate")
+        .isEqualTo(SensorStatus.IN_MAINTENANCE);
+    pause();
+    lifecycle.changeStatus(ADMIN, sensor.id(), SensorStatus.ACTIVE, "back in service");
+    pause();
+    lifecycle.changeStatus(ADMIN, sensor.id(), SensorStatus.IN_MAINTENANCE, "relocation");
+    lifecycle.reassign(ADMIN, sensor.id(), second.id(), "new cold room");
+    lifecycle.retire(ADMIN, sensor.id(), "end of life");
+
+    Sensor read = sensors.get(ADMIN, sensor.id());
+    assertThat(read.status()).isEqualTo(SensorStatus.RETIRED);
+    assertThat(read.assetId()).isEqualTo(second.id());
+    assertThat(
+            jdbc.sql("SELECT count(*) FROM calibration_record WHERE sensor_id = ?")
+                .param(sensor.id())
+                .query(Long.class)
+                .single())
+        .isEqualTo(2);
+    assertThat(
+            jdbc.sql(
+                    "SELECT asset_id, previous_asset_id FROM sensor_assignment_history WHERE sensor_id = ? ORDER BY assigned_at")
+                .param(sensor.id())
+                .query()
+                .listOfRows())
+        .extracting(r -> r.get("asset_id"), r -> r.get("previous_asset_id"))
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(first.id(), null),
+            org.assertj.core.groups.Tuple.tuple(second.id(), first.id()));
+    assertThat(
+            jdbc.sql("SELECT DISTINCT action FROM sensor_lifecycle_audit WHERE sensor_id = ?")
+                .param(sensor.id())
+                .query(String.class)
+                .list())
+        .containsExactlyInAnyOrder(
+            "REGISTERED",
+            "CALIBRATION_RECORDED",
+            "PROFILE_UPDATED",
+            "STATUS_CHANGED",
+            "REASSIGNED",
+            "RETIRED");
+
+    List<Map<String, Object>> events =
+        jdbc.sql(
+                "SELECT event_type, aggregate_version FROM outbox_event WHERE aggregate_id = ? ORDER BY aggregate_version")
+            .param(sensor.id().toString())
+            .query()
+            .listOfRows();
+    assertThat(events.stream().map(r -> r.get("event_type")))
+        .containsExactly(
+            "SensorCalibrationRecorded",
+            "OperationalProfileUpdated",
+            "SensorStatusChanged",
+            "SensorCalibrationRecorded",
+            "SensorStatusChanged",
+            "SensorStatusChanged",
+            "SensorReassigned",
+            "SensorRetired",
+            "SensorStatusChanged");
+    assertThat(events.stream().map(r -> ((Number) r.get("aggregate_version")).longValue()))
+        .containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L);
+
+    long audits = count("sensor_lifecycle_audit");
+    long outbox = count("outbox_event");
+    assertThatThrownBy(
+            () -> lifecycle.changeStatus(ADMIN, sensor.id(), SensorStatus.ACTIVE, "revive"))
+        .isInstanceOf(com.coldguard.asset.domain.SensorTransitionNotAllowedException.class);
+    assertThat(count("sensor_lifecycle_audit"))
+        .as("a rejected change leaves no trace")
+        .isEqualTo(audits);
+    assertThat(count("outbox_event")).isEqualTo(outbox);
+    assertThat(history.history(ADMIN, sensor.id(), "", 100).items()).isNotEmpty();
+  }
+
+  @Test
+  void theHistoryCursorWalksRealRowsIncludingEntriesWrittenInTheSameInstant() throws Exception {
+    Sensor sensor = registered(anAsset());
+    pause();
+    lifecycle.changeStatus(ADMIN, sensor.id(), SensorStatus.INACTIVE, "off");
+    pause();
+    lifecycle.changeStatus(ADMIN, sensor.id(), SensorStatus.IN_MAINTENANCE, "inspect");
+
+    List<String> expected =
+        jdbc.sql(
+                "SELECT id::text FROM sensor_lifecycle_audit WHERE sensor_id = ? ORDER BY occurred_at DESC, id DESC")
+            .param(sensor.id())
+            .query(String.class)
+            .list();
+    assertThat(expected).hasSize(5);
+    assertThat(
+            jdbc.sql(
+                    "SELECT count(DISTINCT occurred_at) FROM sensor_lifecycle_audit WHERE sensor_id = ?")
+                .param(sensor.id())
+                .query(Long.class)
+                .single())
+        .as("registration writes three entries at the same instant")
+        .isLessThan(5);
+
+    List<String> walked = new java.util.ArrayList<>();
+    String cursor = "";
+    do {
+      var page = history.history(ADMIN, sensor.id(), cursor, 2);
+      page.items().forEach(e -> walked.add(e.id().toString()));
+      cursor = page.nextCursor();
+    } while (!cursor.isEmpty());
+
+    assertThat(walked).containsExactlyElementsOf(expected);
+  }
+
+  @Test
+  void theEvaluationContextIsReadWithOneJoinIncludingTheArrayParameter() {
+    Asset asset = anAsset();
+    Sensor withProfile = registered(asset);
+    Sensor bare = sensors.register(ADMIN, asset.id(), unique("SN"), null, "CELSIUS", null, null);
+    Actor telemetry = Actor.system("telemetry-service");
+
+    var context = contexts.get(telemetry, withProfile.id());
+    assertThat(context.assetId()).isEqualTo(asset.id());
+    assertThat(context.assetCriticality()).isEqualTo(Criticality.HIGH);
+    assertThat(context.status()).isEqualTo(SensorStatus.ACTIVE);
+    assertThat(context.profile().minTemperature()).isEqualByComparingTo("2.00");
+    assertThat(context.profile().maxTemperature()).isEqualByComparingTo("8.00");
+    assertThat(context.profile().persistenceWindow()).isEqualTo(Duration.ofMinutes(5));
+    assertThat(context.profile().expectedInterval()).isEqualTo(Duration.ofSeconds(5));
+    assertThat(context.profile().calibrationValidity()).isNull();
+    assertThat(context.profile().version()).isEqualTo(1);
+
+    var batch =
+        contexts.getMany(
+            telemetry, List.of(withProfile.id(), bare.id(), UUID.randomUUID(), bare.id()));
+    assertThat(batch).hasSize(2);
+    assertThat(
+            batch.stream()
+                .filter(c -> c.sensorId().equals(bare.id()))
+                .findFirst()
+                .orElseThrow()
+                .profile())
+        .isNull();
+
+    catalog.updateAsset(ADMIN, asset.id(), 1, null, null, Criticality.CRITICAL);
+    lifecycle.changeStatus(ADMIN, bare.id(), SensorStatus.INACTIVE, "off");
+    assertThat(contexts.get(telemetry, withProfile.id()).assetCriticality())
+        .isEqualTo(Criticality.CRITICAL);
+    assertThat(contexts.get(telemetry, bare.id()).status()).isEqualTo(SensorStatus.INACTIVE);
+    assertThat(contexts.getMany(telemetry, List.of())).isEmpty();
+  }
+
+  @Test
+  void twoSimultaneousChangesToTheSameSensorLeaveExactlyOneApplied() throws Exception {
+    Sensor sensor =
+        sensors.register(ADMIN, anAsset().id(), unique("SN"), null, "CELSIUS", null, null);
+    long before =
+        jdbc.sql(
+                "SELECT count(*) FROM sensor_lifecycle_audit WHERE sensor_id = ? AND action = 'STATUS_CHANGED'")
+            .param(sensor.id())
+            .query(Long.class)
+            .single();
+    var start = new java.util.concurrent.CountDownLatch(1);
+    var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      List<java.util.concurrent.Future<Boolean>> results = new java.util.ArrayList<>();
+      for (int i = 0; i < 2; i++) {
+        results.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  try {
+                    lifecycle.changeStatus(ADMIN, sensor.id(), SensorStatus.INACTIVE, "concurrent");
+                    return true;
+                  } catch (StaleVersionException
+                      | com.coldguard.asset.domain.BusinessRuleViolationException rejected) {
+                    return false;
+                  }
+                }));
+      }
+      start.countDown();
+      long applied = 0;
+      for (var result : results) {
+        applied += result.get(30, java.util.concurrent.TimeUnit.SECONDS) ? 1 : 0;
+      }
+      assertThat(applied).isEqualTo(1);
+    } finally {
+      pool.shutdownNow();
+    }
+
+    assertThat(sensors.get(ADMIN, sensor.id()).status()).isEqualTo(SensorStatus.INACTIVE);
+    assertThat(
+            jdbc.sql(
+                    "SELECT count(*) FROM sensor_lifecycle_audit WHERE sensor_id = ? AND action = 'STATUS_CHANGED'")
+                .param(sensor.id())
+                .query(Long.class)
+                .single())
+        .isEqualTo(before + 1);
   }
 }

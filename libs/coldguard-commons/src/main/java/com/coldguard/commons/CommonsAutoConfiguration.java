@@ -4,6 +4,9 @@ import com.coldguard.commons.correlation.CorrelationIdFilter;
 import com.coldguard.commons.grpc.CorrelationClientInterceptor;
 import com.coldguard.commons.grpc.CorrelationServerInterceptor;
 import com.coldguard.commons.security.ActorServerInterceptor;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -66,8 +69,9 @@ public class CommonsAutoConfiguration {
   }
 
   /**
-   * Trusts the actor propagated by the Gateway only when the mTLS peer is the Gateway; see {@link
-   * ActorServerInterceptor}.
+   * Resolves the caller from the mTLS peer certificate: the Gateway propagates users, and the
+   * common names listed in {@code coldguard.security.system-callers} act as system callers; see
+   * {@link ActorServerInterceptor}.
    */
   @Configuration(proxyBeanMethods = false)
   @ConditionalOnClass(name = "org.springframework.grpc.server.GlobalServerInterceptor")
@@ -80,8 +84,13 @@ public class CommonsAutoConfiguration {
     @Bean
     @GlobalServerInterceptor
     @ConditionalOnMissingBean
-    ActorServerInterceptor actorServerInterceptor() {
-      return new ActorServerInterceptor();
+    ActorServerInterceptor actorServerInterceptor(
+        @Value("${coldguard.security.system-callers:}") List<String> systemCallers) {
+      return new ActorServerInterceptor(
+          systemCallers.stream()
+              .map(String::strip)
+              .filter(name -> !name.isEmpty())
+              .collect(Collectors.toUnmodifiableSet()));
     }
   }
 }

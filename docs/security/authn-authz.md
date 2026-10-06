@@ -83,6 +83,12 @@ Notas:
 - Un servicio interno **solo acepta** esa metadata si el certificado mTLS del par tiene CN
   `gateway`. De cualquier otro cliente con certificado válido (p. ej. el simulador) la ignora y la
   llamada se trata como sin actor. Los servicios internos nunca leen `Authorization`.
+- **Llamadores de sistema.** Un servicio interno que llama con su propio certificado y no en nombre
+  de un usuario (hoy, Telemetry leyendo el contexto de evaluación de Asset) es un actor
+  `system:<nombre>`. Se reconoce por el CN de su certificado, solo si figura en
+  `coldguard.security.system-callers` del servicio que recibe la llamada (Asset: `telemetry-service`);
+  cualquier metadata de identidad que envíe se ignora. El Gateway nunca puede propagar un actor
+  `system:`. Un llamador de sistema no tiene roles: no puede ejecutar comandos de usuarios.
 - Defensa en profundidad: los casos de uso sensibles validan el rol en `application` (hoy,
   `CloseIncidentService` exige `MAINTENANCE_TECHNICIAN`, RN-019). Una llamada sin actor se rechaza
   con `PERMISSION_DENIED`.
