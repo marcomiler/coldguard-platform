@@ -473,6 +473,7 @@ class IngestReadingsServiceTest {
             0,
             null,
             NOW.minusSeconds(30),
+            null,
             silent.version()));
     f.clock.advance(Duration.ofSeconds(60));
 

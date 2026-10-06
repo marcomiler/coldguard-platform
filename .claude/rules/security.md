@@ -15,7 +15,7 @@
   `coldguard.security.system-callers` (Telemetry, for Asset's evaluation context) is a role-less
   `system:` actor, and the Gateway can never propagate one. The
   interceptor, `Actor` and `Role` live in `coldguard-commons` and are auto-registered in every
-  service with a gRPC server (incident and asset today); telemetry must use it when it gets one. Internal services
+  service with a gRPC server (incident, asset and telemetry). Internal services
   must never parse or trust a raw `Authorization` header themselves — that re-implements edge auth
   regardless of which mechanism is eventually picked.
 - Never log secrets, tokens, or credentials — in code, telemetry, traces, or business events

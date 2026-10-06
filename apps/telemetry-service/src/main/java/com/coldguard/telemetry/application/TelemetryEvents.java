@@ -4,6 +4,7 @@ import com.coldguard.commons.messaging.EventActor;
 import com.coldguard.commons.messaging.outbox.OutboundEvent;
 import com.coldguard.telemetry.domain.Anomaly;
 import com.coldguard.telemetry.domain.EvaluationProfile;
+import com.coldguard.telemetry.domain.SensorCondition;
 import com.coldguard.telemetry.domain.SensorContext;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -63,5 +64,30 @@ final class TelemetryEvents {
             anomaly.magnitude().name(),
             persistent,
             recordedAt));
+  }
+
+  record ConnectivityLost(
+      UUID sensorId,
+      UUID assetId,
+      Instant lastReadingAt,
+      int expectedIntervalSeconds,
+      Instant detectedAt) {}
+
+  static OutboundEvent connectivityLost(
+      SensorCondition condition, Instant detectedAt, EventActor actor) {
+    return new OutboundEvent(
+        "SensorConnectivityLost",
+        1,
+        "Sensor",
+        condition.sensorId().toString(),
+        "telemetry.sensor-connectivity-lost",
+        actor,
+        detectedAt,
+        new ConnectivityLost(
+            condition.sensorId(),
+            condition.assetId(),
+            condition.lastReadingAt(),
+            condition.expectedIntervalSeconds(),
+            detectedAt));
   }
 }

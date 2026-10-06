@@ -95,7 +95,7 @@ Para reiniciar de cero: `docker compose down` y `docker volume rm local_postgres
 | Historial del sensor | `/sensors/{id}/history` | Real |
 | Inyectar lecturas de prueba | `POST /telemetry/test-readings` | Real |
 | Lecturas de un sensor | `/sensors/{id}/readings` (requiere `from` y `to`) | Real |
-| Conectividad | `/sensors/connectivity` | Planificado (SPEC-006, entrega B) |
+| Conectividad | `/sensors/connectivity?onlyLost&page&size` | Real |
 | Tablero de incidentes, detalle, reconocer, escalar, cerrar | `/incidents…` | Planificado (SPEC-007) |
 | Métricas operativas | `/metrics/incidents` | Planificado (SPEC-007) |
 | Bitácora de auditoría | `/audit-records` | Planificado (SPEC-007) |

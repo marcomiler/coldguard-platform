@@ -1,5 +1,6 @@
 package com.coldguard.telemetry.infrastructure;
 
+import com.coldguard.telemetry.application.SensorContextEviction;
 import com.coldguard.telemetry.application.SensorContexts;
 import com.coldguard.telemetry.domain.SensorContext;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -18,7 +19,7 @@ import java.util.UUID;
  * call Asset for every batch. The time limit bounds how stale a context can be if a change event is
  * late (eventual consistency); a sensor that does not exist is never cached.
  */
-public class CachedSensorContexts implements SensorContexts {
+public class CachedSensorContexts implements SensorContexts, SensorContextEviction {
 
   private final Cache<UUID, SensorContext> cache;
   private final AssetContextClient asset;
@@ -56,11 +57,13 @@ public class CachedSensorContexts implements SensorContexts {
   }
 
   /** Forgets one sensor, so its next reading asks Asset again. */
+  @Override
   public void evict(UUID sensorId) {
     cache.invalidate(sensorId);
   }
 
   /** Forgets everything. */
+  @Override
   public void evictAll() {
     cache.invalidateAll();
   }

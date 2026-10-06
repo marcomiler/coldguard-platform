@@ -236,9 +236,38 @@ sensor en caché 200, sensor no cacheado 503, recuperación al reiniciarlo. No v
 Compose: la autorización por CN del simulador frente al del Gateway (los puertos gRPC no se
 publican y no hay `grpcurl`); queda cubierta por las pruebas de cableado en proceso.
 
-**Pendiente (entrega B):** consumidor de cambios de Asset (invalidación de caché), tarea de
-conectividad, `ListConnectivityStatus` y `GET /sensors/connectivity`, y las correcciones D-05/D-06
-de documentación.
+**Entrega B (hecha):** consumidor de cambios de Asset (`telemetry-service.asset-changes`),
+tarea de conectividad, RPC `ListConnectivityStatus` y `GET /sensors/connectivity` (ruta literal en el
+Gateway, tiene precedencia sobre `/sensors/{id}`). Las correcciones D-05/D-06 ya estaban aplicadas
+por DEC-016; se completó `container-diagram.md` (DEC-017).
+
+**Decisiones de la entrega B:**
+- El consumidor usa `runOnce` (no `runInOrder`): la cola solo recibe algunos eventos de cada
+  agregado, así que las versiones tendrían huecos. Como sustituto, los cambios se aplican como
+  "fijar a este valor" y `sensor_condition.asset_state_at` impide que un evento más viejo deshaga
+  uno más nuevo (migración V4).
+- Un cambio de estado limpia siempre la marca de pérdida de conectividad: un sensor fuera de
+  servicio no se monitorea, y uno que vuelve a `ACTIVE` recibe un intervalo completo desde el
+  cambio antes de poder marcarse (si no, quedaría marcado por las lecturas que no pudo enviar).
+- Un sensor sin lecturas no tiene fila de condición: los eventos de Asset solo invalidan su caché y
+  la condición se crea con la respuesta de Asset en su primera lectura. Por eso un sensor que
+  nunca reportó no aparece en `/sensors/connectivity`.
+- Con el simulador aún inexistente (SPEC-010), un sensor al que se le inyecta una lectura se marcará
+  como perdido tras `intervalo × tolerancia` (con el perfil de demo, 7,5 s más el periodo de
+  revisión). Es el comportamiento esperado, no un fallo.
+- `tolerance-factor` (1,5) y `check-interval` (30 s) son placeholders académicos; el intervalo se
+  puede cambiar con `TELEMETRY_CONNECTIVITY_CHECK_INTERVAL`.
+- No se publica evento de reconexión (propuesta de la sección de decisiones): se registra en log.
+
+**Verificación de la entrega B:** pruebas unitarias (manejador, monitor, consulta, wiring gRPC),
+integración con PostgreSQL y RabbitMQ reales (consumo y duplicado, mensaje imposible a DLQ, un
+único `SensorConnectivityLost` conforme a su esquema, lectura que limpia la marca, `SKIP LOCKED`
+entre instancias, paginación) con mutaciones sobre el SQL, y contrato/REST del Gateway. En Compose
+(intervalo de revisión 10 s): sensores sin lecturas durante 25 s → marcados, 2 eventos con actor
+`SYSTEM/connectivity-monitor` que llegan a `incident-service.audit`, sin repetirse, sin incidentes
+y con `SensorStatus` sin cambio; una lectura nueva limpia solo la marca de su sensor; un cambio de
+estado a `IN_MAINTENANCE` se refleja en `sensor_condition` al instante y la siguiente lectura sale
+`eligible=false` sin esperar al TTL.
 
 ## Riesgos
 

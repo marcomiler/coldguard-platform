@@ -52,12 +52,13 @@ Notas:
   comando, RF ni evento para ello. Un comando del Operador requiere antes un RF/CU nuevo.
 - El Auditor lee solo la bitácora. **Pendiente de confirmar con el PO.**
 - Hoy el Gateway implementa `POST /auth/login`, los endpoints de incidentes (creación y cierre), la
-  administración de usuarios (`/users`) y los recursos de Asset (`/organizations`, `/assets`,
-  `/sensors` y sus sub-recursos); el resto de las filas (telemetría, métricas, bitácora, consulta
-  y gestión de incidentes) están declaradas en la política pero la ruta aún no existe y responde
+  administración de usuarios (`/users`), los recursos de Asset (`/organizations`, `/assets`,
+  `/sensors` y sus sub-recursos) y los de Telemetry (`/telemetry/test-readings`,
+  `/sensors/{id}/readings`, `/sensors/connectivity`); el resto de las filas (métricas, bitácora,
+  consulta y gestión de incidentes) están declaradas en la política pero la ruta aún no existe y responde
   `404` a quien tenga el rol.
-- `GET /sensors/connectivity` (Telemetry) comparte el patrón de `GET /sensors/{id}`: hasta que su
-  controlador exista, "connectivity" se trata como un id y Asset responde `404`.
+- `GET /sensors/connectivity` (Telemetry) es una ruta literal y tiene precedencia sobre
+  `GET /sensors/{id}` (Asset); ambas exigen los mismos roles.
 
 ## Administración de usuarios (`/users`)
 

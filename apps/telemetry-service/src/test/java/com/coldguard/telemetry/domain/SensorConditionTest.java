@@ -159,6 +159,7 @@ class SensorConditionTest {
             0,
             null,
             T0,
+            null,
             4);
     Instant now = T0.plusSeconds(60);
 

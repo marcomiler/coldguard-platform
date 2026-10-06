@@ -15,8 +15,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.coldguard.common.grpc.v1.CursorPageInfo;
 import com.coldguard.gateway.infrastructure.DownstreamCallException;
 import com.coldguard.gateway.infrastructure.TelemetryGrpcClient;
+import com.coldguard.telemetry.grpc.v1.ConnectivityStatus;
 import com.coldguard.telemetry.grpc.v1.IngestReadingsRequest;
 import com.coldguard.telemetry.grpc.v1.IngestReadingsResponse;
+import com.coldguard.telemetry.grpc.v1.ListConnectivityStatusResponse;
 import com.coldguard.telemetry.grpc.v1.ListReadingsRequest;
 import com.coldguard.telemetry.grpc.v1.ListReadingsResponse;
 import com.coldguard.telemetry.grpc.v1.MagnitudeLevel;
@@ -372,5 +374,89 @@ class TelemetryRestApiTest {
         .andExpect(
             content()
                 .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("9092"))));
+  }
+
+  // ---- connectivity -------------------------------------------------------------------------
+
+  @Test
+  void connectivityIsServedByItsOwnRouteAndNotTakenForASensorId() throws Exception {
+    given(telemetry.listConnectivityStatus(any()))
+        .willReturn(
+            ListConnectivityStatusResponse.newBuilder()
+                .addStatuses(
+                    ConnectivityStatus.newBuilder()
+                        .setSensorId(SENSOR)
+                        .setAssetId("a-1")
+                        .setLastReadingAt(T0)
+                        .setExpectedReadingInterval(
+                            com.google.protobuf.Duration.newBuilder().setSeconds(30))
+                        .setConnectivityLostAt(T0))
+                .addStatuses(
+                    ConnectivityStatus.newBuilder()
+                        .setSensorId("s-2")
+                        .setAssetId("a-1")
+                        .setExpectedReadingInterval(
+                            com.google.protobuf.Duration.newBuilder().setSeconds(60)))
+                .setPage(
+                    com.coldguard.common.grpc.v1.PageInfo.newBuilder()
+                        .setPage(1)
+                        .setSize(2)
+                        .setTotalElements(3)
+                        .setTotalPages(2))
+                .build());
+
+    mockMvc
+        .perform(
+            get("/api/v1/sensors/connectivity")
+                .param("onlyLost", "true")
+                .param("page", "1")
+                .param("size", "2"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(2))
+        .andExpect(jsonPath("$.items[0].sensorId").value(SENSOR))
+        .andExpect(jsonPath("$.items[0].expectedReadingIntervalSeconds").value(30))
+        .andExpect(jsonPath("$.items[0].connectivityLostAt").exists())
+        .andExpect(jsonPath("$.items[1].lastReadingAt").doesNotExist())
+        .andExpect(jsonPath("$.items[1].connectivityLostAt").doesNotExist())
+        .andExpect(jsonPath("$.page.totalElements").value(3))
+        .andExpect(jsonPath("$.page.totalPages").value(2));
+
+    var request =
+        org.mockito.ArgumentCaptor.forClass(
+            com.coldguard.telemetry.grpc.v1.ListConnectivityStatusRequest.class);
+    org.mockito.Mockito.verify(telemetry).listConnectivityStatus(request.capture());
+    assertThat(request.getValue().getOnlyLost()).isTrue();
+    assertThat(request.getValue().getPage().getPage()).isEqualTo(1);
+    assertThat(request.getValue().getPage().getSize()).isEqualTo(2);
+  }
+
+  @Test
+  void connectivityDefaultsToEveryStatusAndTheFirstPage() throws Exception {
+    given(telemetry.listConnectivityStatus(any()))
+        .willReturn(ListConnectivityStatusResponse.getDefaultInstance());
+
+    mockMvc.perform(get("/api/v1/sensors/connectivity")).andExpect(status().isOk());
+
+    var request =
+        org.mockito.ArgumentCaptor.forClass(
+            com.coldguard.telemetry.grpc.v1.ListConnectivityStatusRequest.class);
+    org.mockito.Mockito.verify(telemetry).listConnectivityStatus(request.capture());
+    assertThat(request.getValue().getOnlyLost()).isFalse();
+    assertThat(request.getValue().getPage().getPage()).isZero();
+    assertThat(request.getValue().getPage().getSize()).isZero();
+  }
+
+  @Test
+  void aConnectivityOutageIsA503() throws Exception {
+    willThrow(
+            new DownstreamCallException(
+                "telemetry-service", Status.Code.UNAVAILABLE, null, "refused", null))
+        .given(telemetry)
+        .listConnectivityStatus(any());
+
+    mockMvc
+        .perform(get("/api/v1/sensors/connectivity"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("UPSTREAM_UNAVAILABLE"));
   }
 }
