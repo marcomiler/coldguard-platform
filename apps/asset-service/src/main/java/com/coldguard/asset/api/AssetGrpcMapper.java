@@ -1,9 +1,13 @@
 package com.coldguard.asset.api;
 
+import com.coldguard.asset.application.CursorPage;
 import com.coldguard.asset.application.OperationalProfileDraft;
 import com.coldguard.asset.application.Page;
+import com.coldguard.asset.application.SensorEvaluationContext;
+import com.coldguard.asset.application.SensorHistoryEntry;
 import com.coldguard.asset.domain.Asset;
 import com.coldguard.asset.domain.CalibrationKind;
+import com.coldguard.asset.domain.CalibrationRecord;
 import com.coldguard.asset.domain.Criticality;
 import com.coldguard.asset.domain.OperationalProfile;
 import com.coldguard.asset.domain.Organization;
@@ -13,9 +17,16 @@ import com.coldguard.asset.domain.SensorStatus;
 import com.coldguard.asset.domain.Site;
 import com.coldguard.common.grpc.v1.PageInfo;
 import com.google.protobuf.Duration;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.NullValue;
+import com.google.protobuf.Struct;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.Value;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** Translates between the gRPC messages and the domain model; no business rule lives here. */
@@ -127,6 +138,60 @@ final class AssetGrpcMapper {
     return builder.build();
   }
 
+  static com.coldguard.asset.grpc.v1.CalibrationRecord toGrpc(CalibrationRecord record) {
+    return com.coldguard.asset.grpc.v1.CalibrationRecord.newBuilder()
+        .setId(record.id().toString())
+        .setSensorId(record.sensorId().toString())
+        .setKind(toGrpc(record.kind()))
+        .setPerformedAt(timestamp(record.performedAt()))
+        .setValidUntil(timestamp(record.validUntil()))
+        .setRecordedAt(timestamp(record.recordedAt()))
+        .setRecordedBy(record.recordedBy())
+        .setReason(record.reason())
+        .build();
+  }
+
+  static com.coldguard.asset.grpc.v1.SensorHistoryEntry toGrpc(SensorHistoryEntry entry) {
+    com.coldguard.asset.grpc.v1.SensorHistoryEntry.Builder builder =
+        com.coldguard.asset.grpc.v1.SensorHistoryEntry.newBuilder()
+            .setId(entry.id().toString())
+            .setAction(entry.action())
+            .setActorType(entry.actorType())
+            .setActorId(entry.actorId())
+            .setOccurredAt(timestamp(entry.occurredAt()));
+    if (entry.previousValue() != null) {
+      builder.setPreviousValue(struct(entry.previousValue()));
+    }
+    if (entry.newValue() != null) {
+      builder.setNewValue(struct(entry.newValue()));
+    }
+    if (entry.reason() != null) {
+      builder.setReason(entry.reason());
+    }
+    return builder.build();
+  }
+
+  static com.coldguard.asset.grpc.v1.SensorEvaluationContext toGrpc(
+      SensorEvaluationContext context) {
+    com.coldguard.asset.grpc.v1.SensorEvaluationContext.Builder builder =
+        com.coldguard.asset.grpc.v1.SensorEvaluationContext.newBuilder()
+            .setSensorId(context.sensorId().toString())
+            .setAssetId(context.assetId().toString())
+            .setAssetCriticality(toGrpc(context.assetCriticality()))
+            .setStatus(toGrpc(context.status()));
+    if (context.profile() != null) {
+      builder.setProfile(toGrpc(context.profile()));
+    }
+    return builder.build();
+  }
+
+  static com.coldguard.common.grpc.v1.CursorPageInfo cursorInfo(CursorPage<?> page) {
+    return com.coldguard.common.grpc.v1.CursorPageInfo.newBuilder()
+        .setNextCursor(page.nextCursor())
+        .setHasMore(page.hasMore())
+        .build();
+  }
+
   static PageInfo pageInfo(Page<?> page) {
     return PageInfo.newBuilder()
         .setPage(page.page())
@@ -191,6 +256,19 @@ final class AssetGrpcMapper {
     return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
   }
 
+  /** Ids that are not UUIDs cannot match anything, so they are left out. */
+  static List<UUID> idsIgnoringMalformed(List<String> values) {
+    List<UUID> ids = new ArrayList<>();
+    for (String value : values) {
+      try {
+        ids.add(UUID.fromString(value));
+      } catch (IllegalArgumentException notAnId) {
+        // skipped
+      }
+    }
+    return ids;
+  }
+
   // ---- primitives ---------------------------------------------------------------------------
 
   private static com.coldguard.common.grpc.v1.Criticality toGrpc(Criticality criticality) {
@@ -234,5 +312,37 @@ final class AssetGrpcMapper {
 
   private static java.time.Duration toDuration(Duration duration) {
     return java.time.Duration.ofSeconds(duration.getSeconds(), duration.getNanos());
+  }
+
+  private static com.coldguard.asset.grpc.v1.CalibrationKind toGrpc(CalibrationKind kind) {
+    return switch (kind) {
+      case CALIBRATION -> com.coldguard.asset.grpc.v1.CalibrationKind.CALIBRATION_KIND_CALIBRATION;
+      case VERIFICATION ->
+          com.coldguard.asset.grpc.v1.CalibrationKind.CALIBRATION_KIND_VERIFICATION;
+    };
+  }
+
+  /** The JSON-like values of a history entry as a protobuf Struct. */
+  private static Struct struct(Map<String, Object> values) {
+    Struct.Builder builder = Struct.newBuilder();
+    values.forEach((key, value) -> builder.putFields(key, value(value)));
+    return builder.build();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Value value(Object value) {
+    return switch (value) {
+      case null -> Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build();
+      case Boolean flag -> Value.newBuilder().setBoolValue(flag).build();
+      case Number number -> Value.newBuilder().setNumberValue(number.doubleValue()).build();
+      case Map<?, ?> map ->
+          Value.newBuilder().setStructValue(struct((Map<String, Object>) map)).build();
+      case Iterable<?> items -> {
+        ListValue.Builder list = ListValue.newBuilder();
+        items.forEach(item -> list.addValues(value(item)));
+        yield Value.newBuilder().setListValue(list).build();
+      }
+      default -> Value.newBuilder().setStringValue(value.toString()).build();
+    };
   }
 }

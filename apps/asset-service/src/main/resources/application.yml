@@ -62,6 +62,10 @@ spring:
       ddl-auto: validate
 
 coldguard:
+  security:
+    # Internal services that call Asset with their own certificate, not on behalf of a user
+    # (Telemetry reads the evaluation context). Identity metadata from them is ignored.
+    system-callers: ${ASSET_SYSTEM_CALLERS:telemetry-service}
   asset:
     calibration:
       # Validity applied to a calibration when the sensor's profile defines none. Empty means no

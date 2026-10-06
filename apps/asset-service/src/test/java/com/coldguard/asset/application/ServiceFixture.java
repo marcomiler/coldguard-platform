@@ -5,14 +5,13 @@ import com.coldguard.asset.domain.Criticality;
 import com.coldguard.asset.domain.Organization;
 import com.coldguard.asset.domain.Site;
 import com.coldguard.asset.support.InMemoryAssetStore;
+import com.coldguard.asset.support.MutableClock;
 import com.coldguard.asset.support.RecordingEvents;
 import com.coldguard.commons.security.Actor;
 import com.coldguard.commons.security.Role;
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Set;
 import java.util.UUID;
 
@@ -24,9 +23,10 @@ class ServiceFixture {
   static final Actor SUPERVISOR = new Actor("sup-1", Set.of(Role.OPERATIONS_SUPERVISOR));
   static final Actor OPERATOR = new Actor("op-1", Set.of(Role.OPERATOR));
 
-  final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+  final MutableClock clock = new MutableClock(NOW);
   final InMemoryAssetStore store = new InMemoryAssetStore();
   final RecordingEvents events = new RecordingEvents();
+  private int assetCount;
   final PageRequestPolicy paging = new PageRequestPolicy(100, 20);
 
   final AssetCatalogService catalog =
@@ -40,6 +40,26 @@ class ServiceFixture {
   final OperationalProfileService profiles =
       new OperationalProfileService(
           store.sensorRepository, store.profileRepository, store.historyRepository, events, clock);
+
+  SensorLifecycleService lifecycle(Duration defaultValidity) {
+    return new SensorLifecycleService(
+        store.assetRepository,
+        store.sensorRepository,
+        store.profileRepository,
+        store.calibrationRepository,
+        store.historyRepository,
+        new CalibrationPolicy(defaultValidity),
+        events,
+        clock);
+  }
+
+  SensorHistoryService history() {
+    return new SensorHistoryService(store.sensorRepository, store.historyRepository, paging);
+  }
+
+  EvaluationContextService contexts(int maxBatch) {
+    return new EvaluationContextService(store.evaluationContextRepository, maxBatch);
+  }
 
   SensorService sensors(Duration defaultValidity) {
     return new SensorService(
@@ -55,7 +75,7 @@ class ServiceFixture {
   }
 
   Asset anAsset() {
-    Organization organization = catalog.createOrganization(ADMIN, "Acme");
+    Organization organization = catalog.createOrganization(ADMIN, "Acme " + ++assetCount);
     Site site = catalog.createSite(ADMIN, organization.id(), "Main site", null);
     return catalog.registerAsset(ADMIN, site.id(), "Cold room 1", null, Criticality.HIGH);
   }

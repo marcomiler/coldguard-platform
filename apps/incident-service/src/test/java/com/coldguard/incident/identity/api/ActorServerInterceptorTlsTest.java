@@ -67,7 +67,26 @@ class ActorServerInterceptorTlsTest {
     assertThat(seenActor.get()).isNull();
   }
 
+  @Test
+  void configuredSystemCaller_isASystemActorOverARealHandshakeWhateverItClaims() throws Exception {
+    call("telemetry-service", new ActorServerInterceptor(java.util.Set.of("telemetry-service")));
+
+    assertThat(seenActor.get()).isEqualTo(Actor.system("telemetry-service"));
+  }
+
+  @Test
+  void aCertificateOutsideTheSystemCallersStaysAnonymousEvenWhenItClaimsAnAdminOverARealHandshake()
+      throws Exception {
+    call("sensor-simulator", new ActorServerInterceptor(java.util.Set.of("telemetry-service")));
+
+    assertThat(seenActor.get()).isNull();
+  }
+
   private void call(String clientIdentity) throws Exception {
+    call(clientIdentity, new ActorServerInterceptor());
+  }
+
+  private void call(String clientIdentity, ActorServerInterceptor interceptor) throws Exception {
     EphemeralCertificateAuthority ca = EphemeralCertificateAuthority.generate();
     IssuedCertificate serverCert = ca.issueLeafCertificate("incident-service", "localhost");
     IssuedCertificate clientCert = ca.issueLeafCertificate(clientIdentity, "client");
@@ -92,7 +111,7 @@ class ActorServerInterceptorTlsTest {
                         responseObserver.onCompleted();
                       }
                     },
-                    new ActorServerInterceptor()))
+                    interceptor))
             .build()
             .start();
     channel =

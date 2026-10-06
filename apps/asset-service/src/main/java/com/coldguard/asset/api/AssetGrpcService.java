@@ -5,14 +5,23 @@ import static com.coldguard.asset.api.AssetGrpcMapper.optionalId;
 import static com.coldguard.asset.api.AssetGrpcMapper.toGrpc;
 
 import com.coldguard.asset.application.AssetCatalogService;
+import com.coldguard.asset.application.EvaluationContextService;
 import com.coldguard.asset.application.OperationalProfileService;
+import com.coldguard.asset.application.SensorHistoryService;
+import com.coldguard.asset.application.SensorLifecycleService;
 import com.coldguard.asset.application.SensorService;
 import com.coldguard.asset.domain.Criticality;
 import com.coldguard.asset.grpc.v1.AssetServiceGrpc;
+import com.coldguard.asset.grpc.v1.ChangeSensorStatusRequest;
 import com.coldguard.asset.grpc.v1.CreateOrganizationRequest;
 import com.coldguard.asset.grpc.v1.CreateSiteRequest;
 import com.coldguard.asset.grpc.v1.GetAssetRequest;
 import com.coldguard.asset.grpc.v1.GetOperationalProfileRequest;
+import com.coldguard.asset.grpc.v1.GetSensorEvaluationContextRequest;
+import com.coldguard.asset.grpc.v1.GetSensorEvaluationContextsRequest;
+import com.coldguard.asset.grpc.v1.GetSensorEvaluationContextsResponse;
+import com.coldguard.asset.grpc.v1.GetSensorHistoryRequest;
+import com.coldguard.asset.grpc.v1.GetSensorHistoryResponse;
 import com.coldguard.asset.grpc.v1.GetSensorRequest;
 import com.coldguard.asset.grpc.v1.ListAssetsRequest;
 import com.coldguard.asset.grpc.v1.ListAssetsResponse;
@@ -22,8 +31,11 @@ import com.coldguard.asset.grpc.v1.ListSensorsRequest;
 import com.coldguard.asset.grpc.v1.ListSensorsResponse;
 import com.coldguard.asset.grpc.v1.ListSitesRequest;
 import com.coldguard.asset.grpc.v1.ListSitesResponse;
+import com.coldguard.asset.grpc.v1.ReassignSensorRequest;
+import com.coldguard.asset.grpc.v1.RecordCalibrationRequest;
 import com.coldguard.asset.grpc.v1.RegisterAssetRequest;
 import com.coldguard.asset.grpc.v1.RegisterSensorRequest;
+import com.coldguard.asset.grpc.v1.RetireSensorRequest;
 import com.coldguard.asset.grpc.v1.UpdateAssetRequest;
 import com.coldguard.asset.grpc.v1.UpdateSensorRequest;
 import com.coldguard.asset.grpc.v1.UpsertOperationalProfileRequest;
@@ -36,8 +48,7 @@ import org.springframework.grpc.server.service.GrpcService;
 /**
  * gRPC endpoint of the Asset context (contracts/grpc/asset/v1). It only translates requests to use
  * case calls and results to responses; business errors propagate as exceptions and are mapped to
- * gRPC statuses by {@link AssetGrpcExceptionHandler}. RPCs not implemented yet keep the default
- * UNIMPLEMENTED answer.
+ * gRPC statuses by {@link AssetGrpcExceptionHandler}.
  */
 @GrpcService
 public class AssetGrpcService extends AssetServiceGrpc.AssetServiceImplBase {
@@ -45,12 +56,23 @@ public class AssetGrpcService extends AssetServiceGrpc.AssetServiceImplBase {
   private final AssetCatalogService catalog;
   private final SensorService sensors;
   private final OperationalProfileService profiles;
+  private final SensorLifecycleService lifecycle;
+  private final SensorHistoryService history;
+  private final EvaluationContextService contexts;
 
   public AssetGrpcService(
-      AssetCatalogService catalog, SensorService sensors, OperationalProfileService profiles) {
+      AssetCatalogService catalog,
+      SensorService sensors,
+      OperationalProfileService profiles,
+      SensorLifecycleService lifecycle,
+      SensorHistoryService history,
+      EvaluationContextService contexts) {
     this.catalog = catalog;
     this.sensors = sensors;
     this.profiles = profiles;
+    this.lifecycle = lifecycle;
+    this.history = history;
+    this.contexts = contexts;
   }
 
   private static Actor actor() {
@@ -245,6 +267,97 @@ public class AssetGrpcService extends AssetServiceGrpc.AssetServiceImplBase {
       GetOperationalProfileRequest request,
       StreamObserver<com.coldguard.asset.grpc.v1.OperationalProfile> observer) {
     reply(observer, toGrpc(profiles.get(actor(), id("Sensor", request.getSensorId()))));
+  }
+
+  // ---- lifecycle --------------------------------------------------------------------------
+
+  @Override
+  public void changeSensorStatus(
+      ChangeSensorStatusRequest request,
+      StreamObserver<com.coldguard.asset.grpc.v1.Sensor> observer) {
+    reply(
+        observer,
+        toGrpc(
+            lifecycle.changeStatus(
+                actor(),
+                id("Sensor", request.getSensorId()),
+                AssetGrpcMapper.toDomain(request.getTargetStatus()),
+                request.getReason())));
+  }
+
+  @Override
+  public void recordCalibration(
+      RecordCalibrationRequest request,
+      StreamObserver<com.coldguard.asset.grpc.v1.CalibrationRecord> observer) {
+    reply(
+        observer,
+        toGrpc(
+            lifecycle.recordCalibration(
+                actor(),
+                id("Sensor", request.getSensorId()),
+                AssetGrpcMapper.toDomain(request.getKind()),
+                request.hasPerformedAt()
+                    ? AssetGrpcMapper.toInstant(request.getPerformedAt())
+                    : null,
+                request.getReason())));
+  }
+
+  @Override
+  public void reassignSensor(
+      ReassignSensorRequest request, StreamObserver<com.coldguard.asset.grpc.v1.Sensor> observer) {
+    reply(
+        observer,
+        toGrpc(
+            lifecycle.reassign(
+                actor(),
+                id("Sensor", request.getSensorId()),
+                id("Asset", request.getTargetAssetId()),
+                request.getReason())));
+  }
+
+  @Override
+  public void retireSensor(
+      RetireSensorRequest request, StreamObserver<com.coldguard.asset.grpc.v1.Sensor> observer) {
+    reply(
+        observer,
+        toGrpc(
+            lifecycle.retire(actor(), id("Sensor", request.getSensorId()), request.getReason())));
+  }
+
+  @Override
+  public void getSensorHistory(
+      GetSensorHistoryRequest request, StreamObserver<GetSensorHistoryResponse> observer) {
+    var page =
+        history.history(
+            actor(),
+            id("Sensor", request.getSensorId()),
+            request.getPage().getCursor(),
+            request.getPage().getSize());
+    GetSensorHistoryResponse.Builder reply =
+        GetSensorHistoryResponse.newBuilder().setPage(AssetGrpcMapper.cursorInfo(page));
+    page.items().forEach(entry -> reply.addEntries(toGrpc(entry)));
+    reply(observer, reply.build());
+  }
+
+  // ---- evaluation context (internal callers) ----------------------------------------------
+
+  @Override
+  public void getSensorEvaluationContext(
+      GetSensorEvaluationContextRequest request,
+      StreamObserver<com.coldguard.asset.grpc.v1.SensorEvaluationContext> observer) {
+    reply(observer, toGrpc(contexts.get(actor(), id("Sensor", request.getSensorId()))));
+  }
+
+  @Override
+  public void getSensorEvaluationContexts(
+      GetSensorEvaluationContextsRequest request,
+      StreamObserver<GetSensorEvaluationContextsResponse> observer) {
+    var found =
+        contexts.getMany(actor(), AssetGrpcMapper.idsIgnoringMalformed(request.getSensorIdsList()));
+    GetSensorEvaluationContextsResponse.Builder reply =
+        GetSensorEvaluationContextsResponse.newBuilder();
+    found.forEach(context -> reply.addContexts(toGrpc(context)));
+    reply(observer, reply.build());
   }
 
   private static <T> void reply(StreamObserver<T> observer, T message) {
