@@ -62,8 +62,8 @@ flowchart TB
 | Adaptador de persistencia | Puerto/adaptador hacia PostgreSQL (esquema `incident`, ADR-006); ports and adapters, sin acceso directo desde el resto de los componentes. |
 | Adaptador de mensajería | Puerto/adaptador hacia RabbitMQ (ADR-004); usado por el Publicador de eventos. |
 | Identity & Access (módulo interno) | Dueño de usuarios, roles y asignaciones de acceso (RF-013/CU-014, DEC-004); esquema lógico de persistencia propio (`identity`), accedido a través del mismo adaptador de persistencia. No es un microservicio separado (DEC-008). |
-| Audit Log (módulo interno) | Consulta restringida de solo lectura de la bitácora de auditoría (RF-018/CU-009, DEC-005); esquema lógico de persistencia propio (`auditlog`). No es un microservicio separado (DEC-008). |
-| Consultas operativas (módulo interno) | Atiende RF-009/CU-008 (métricas de negocio: SLA, prioridad, volumen de incidentes) leyendo del Repositorio de incidentes (DEC-006). No es un microservicio separado (DEC-008). |
+| Audit Log (módulo interno) | Consulta restringida de solo lectura de la bitácora de auditoría (RF-018/CU-009, DEC-005); esquema lógico de persistencia propio (`auditlog`). Se alimenta por escritura en proceso (Incident, Identity) y por la cola `incident-service.audit` (Asset, Telemetry, Notification); el repositorio solo permite añadir y leer. No es un microservicio separado (DEC-008). |
+| Consultas operativas (módulo interno) | Atiende RF-009/CU-008 (métricas de negocio: SLA, prioridad, volumen de incidentes) mediante una única consulta SQL de agregación sobre el esquema `incident` (DEC-006); es una consulta, no emite eventos. No es un microservicio separado (DEC-008). |
 
 ## Cómo atraviesan los CU y eventos principales
 
@@ -151,5 +151,5 @@ descomposición en clases/paquetes es diseño técnico posterior, no bloqueado p
 
 - Componentes internos de Telemetry Service y Notification Service: no profundizados en esta
   fase (los de Asset Service están en la sección anterior).
-- Clases y paquetes técnicos concretos de Identity & Access, Audit Log y consultas operativas:
-  diseño técnico posterior.
+- Clases y paquetes técnicos de Identity & Access: diseño técnico posterior. Audit Log y consultas
+  operativas ya están implementados como paquetes `auditlog` y `metrics` del servicio.

@@ -2,6 +2,8 @@ package com.coldguard.incident.identity.application;
 
 import com.coldguard.commons.security.Actor;
 import com.coldguard.commons.security.Role;
+import com.coldguard.incident.auditlog.application.AuditEntry;
+import com.coldguard.incident.auditlog.application.AuditRecorder;
 import com.coldguard.incident.identity.domain.UserAccount;
 import java.time.Clock;
 import java.util.List;

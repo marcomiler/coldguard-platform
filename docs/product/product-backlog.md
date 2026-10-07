@@ -391,28 +391,28 @@ tener una base de estado sobre la cual ejecutar el cierre técnico real (RN-007,
   `IncidentGrpcServiceTest.toGrpcStatus_mapsClosed`).
 - Estado académico: no evidenciada.
 
-### HU-026 — Cerrar un incidente (Técnico de mantenimiento) — parcial
+### HU-026 — Cerrar un incidente (Técnico de mantenimiento)
 **Como** Técnico de mantenimiento, **quiero** cerrar técnicamente un incidente, **para** detener
 el MTTR y dejar registrado el diagnóstico, causa y comentario de resolución (RN-007, RN-019).
-- Criterios de aceptación, separados por lo que ya existe y lo que falta:
-  - **Dominio/aplicación — implementado**: dado un incidente en CREATED, cerrarlo lo deja en
-    CLOSED; cerrar un incidente inexistente o ya CLOSED es rechazado explícitamente
+- Criterios de aceptación:
+  - **Dominio/aplicación — implementado**: cerrar un incidente abierto (CREATED, ACKNOWLEDGED o
+    ESCALATED) lo deja en CLOSED; cerrar uno inexistente o ya CLOSED es rechazado explícitamente
     (`CloseIncidentService`, `IncidentAlreadyClosedException`, `IncidentNotFoundException`).
-  - **RPC gRPC / endpoint REST — pendiente**: no existe ningún RPC `CloseIncident` en
-    `contracts/grpc/incident/v1/incident_service.proto` ni endpoint en el Gateway (DEC-014).
-  - **JWT/RBAC — pendiente**: no se valida que el actor sea el Técnico de mantenimiento; requiere
-    JWT/RBAC real (Sprint 4, sin implementar).
-  - **Causa/comentario de resolución (RN-007) — pendiente**: no se exige ni persiste en la capa
-    hoy implementada.
+  - **Causa/comentario (RN-007) — implementado**: se exigen no vacíos y acotados (`CloseEvidence`)
+    y se persisten junto con `closed_at` y `closed_by` (migración V6); el RPC `CloseIncident`
+    devuelve el `closed_at` almacenado.
+  - **RBAC (RN-019) — implementado en el servicio**: `CloseIncidentService` exige
+    `MAINTENANCE_TECHNICIAN`; el Gateway aplica además su política deny-by-default.
+  - **Evento — implementado**: `IncidentClosed` se escribe en el Outbox en la misma transacción.
   - **Evidencia académica — pendiente**: ningún documento de `docs/academic/` la referencia.
-  - Esta historia **no se marca como completa** mientras falte cualquiera de los cuatro puntos
-    pendientes de arriba.
+  - **Consulta del incidente cerrado por REST (`GET /incidents/{id}`) — pendiente** (Gateway,
+    SPEC-009).
 - Prioridad: Must have.
-- Estimación: por estimar; depende de que exista JWT/RBAC (Sprint 4).
-- Dependencias: HU-025; JWT/RBAC (Sprint 4, sin HU propia todavía).
-- Sprint: parcialmente implementado, fuera de sprint formal; el RPC/REST/JWT/RBAC restante se
-  ubicaría en Sprint 4/5 según se decida — no confirmado.
-- Estado técnico: **parcial** (ver desglose arriba); test existente: `CloseIncidentServiceTest`.
+- Estimación: por estimar.
+- Dependencias: HU-025; JWT/RBAC.
+- Sprint: implementación adelantada, fuera de sprint formal.
+- Estado técnico: implementada en Incident Service (ver desglose arriba); tests:
+  `IncidentLifecycleServicesTest`, `IncidentTest`, `IncidentLifecycleIntegrationTest`.
 - Estado académico: no evidenciada.
 
 ### HU-022 — Exportación planificada de observabilidad a Azure

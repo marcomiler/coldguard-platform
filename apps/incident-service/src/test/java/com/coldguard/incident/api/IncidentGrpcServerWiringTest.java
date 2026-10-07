@@ -9,8 +9,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.coldguard.commons.security.ActorServerInterceptor;
-import com.coldguard.incident.application.CloseIncidentService;
-import com.coldguard.incident.application.CreateIncidentService;
 import com.coldguard.incident.application.IncidentRepository;
 import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
 import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
@@ -55,9 +53,14 @@ class IncidentGrpcServerWiringTest {
   @BeforeEach
   void startServer() throws Exception {
     repository = mock(IncidentRepository.class);
+    GrpcServices services = GrpcServices.over(repository);
     IncidentGrpcService service =
         new IncidentGrpcService(
-            new CreateIncidentService(repository), new CloseIncidentService(repository));
+            services.create,
+            services.acknowledge,
+            services.escalate,
+            services.close,
+            services.query);
     String name = "incident-wiring-" + UUID.randomUUID();
     server =
         InProcessServerBuilder.forName(name)
@@ -99,6 +102,21 @@ class IncidentGrpcServerWiringTest {
     return IncidentServiceGrpc.newBlockingStub(ClientInterceptors.intercept(channel, roleHeader));
   }
 
+  private static com.coldguard.incident.domain.Incident openIncident(String id) {
+    return com.coldguard.incident.domain.Incident.open(
+            id,
+            "a1",
+            "s1",
+            "high-temperature",
+            com.coldguard.incident.domain.Criticality.HIGH,
+            com.coldguard.incident.domain.Magnitude.HIGH,
+            false,
+            null,
+            com.coldguard.incident.domain.DomainFixtures.SLA,
+            java.time.Clock.systemUTC())
+        .incident();
+  }
+
   private static CreateIncidentRequest.Builder validCreate() {
     return CreateIncidentRequest.newBuilder()
         .setAssetId("a1")
@@ -129,8 +147,8 @@ class IncidentGrpcServerWiringTest {
 
   @Test
   void create_openIncidentExists_mapsToAlreadyExistsWithExistingIdTrailer() {
-    given(repository.findOpenIncidentId("a1", "s1", "high-temperature"))
-        .willReturn(Optional.of("existing-1"));
+    given(repository.findOpen("a1", "s1", "high-temperature"))
+        .willReturn(Optional.of(openIncident("existing-1")));
 
     assertThatThrownBy(() -> stub(null).createIncident(validCreate().build()))
         .isInstanceOfSatisfying(
@@ -145,7 +163,7 @@ class IncidentGrpcServerWiringTest {
 
   @Test
   void create_valid_returnsCalculatedIncident() {
-    given(repository.findOpenIncidentId(any(), any(), any())).willReturn(Optional.empty());
+    given(repository.findOpen(any(), any(), any())).willReturn(Optional.empty());
 
     var response = stub(null).createIncident(validCreate().build());
 

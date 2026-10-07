@@ -755,8 +755,7 @@ paths:
       tags: [Incidents]
       summary: List incidents
       operationId: listIncidents
-      x-status: planned
-      x-planned-in: SPEC-007
+      x-status: implemented
       x-roles: [OPERATIONS_SUPERVISOR, OPERATOR, MAINTENANCE_TECHNICIAN]
       parameters:
         - name: status
@@ -831,8 +830,7 @@ paths:
       tags: [Incidents]
       summary: Get an incident
       operationId: getIncident
-      x-status: planned
-      x-planned-in: SPEC-007
+      x-status: implemented
       x-roles: [OPERATIONS_SUPERVISOR, OPERATOR, MAINTENANCE_TECHNICIAN]
       parameters:
         - $ref: '#/components/parameters/IncidentId'
@@ -851,8 +849,7 @@ paths:
       summary: Acknowledge an incident
       description: Moves `CREATED` to `ACKNOWLEDGED`. A second acknowledgement answers `409 INCIDENT_ALREADY_ACKNOWLEDGED`.
       operationId: acknowledgeIncident
-      x-status: planned
-      x-planned-in: SPEC-007
+      x-status: implemented
       x-roles: [OPERATIONS_SUPERVISOR]
       parameters:
         - $ref: '#/components/parameters/IncidentId'
@@ -877,8 +874,7 @@ paths:
       summary: Escalate an incident
       description: A reason is required.
       operationId: escalateIncident
-      x-status: planned
-      x-planned-in: SPEC-007
+      x-status: implemented
       x-roles: [OPERATIONS_SUPERVISOR]
       parameters:
         - $ref: '#/components/parameters/IncidentId'
@@ -934,8 +930,7 @@ paths:
       summary: Operational metrics of incidents
       description: '`from` and `to` bound the incident creation time and are required.'
       operationId: getIncidentMetrics
-      x-status: planned
-      x-planned-in: SPEC-007
+      x-status: implemented
       x-roles: [OPERATIONS_SUPERVISOR]
       parameters:
         - name: from
@@ -961,8 +956,7 @@ paths:
       summary: Audit log
       description: Read-only. `from` and `to` are required; the server limits the range.
       operationId: listAuditRecords
-      x-status: planned
-      x-planned-in: SPEC-007
+      x-status: implemented
       x-roles: [AUDITOR]
       parameters:
         - name: entityType

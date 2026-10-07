@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.coldguard.commons.security.Actor;
 import com.coldguard.commons.security.ActorServerInterceptor;
 import com.coldguard.commons.security.Role;
-import com.coldguard.incident.application.CloseIncidentService;
-import com.coldguard.incident.application.CreateIncidentService;
 import com.coldguard.incident.application.IncidentRepository;
 import com.coldguard.incident.domain.Incident;
 import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
@@ -44,12 +42,17 @@ class IncidentGrpcServiceTest {
   @BeforeEach
   void setUp() {
     repository = new InMemoryIncidentRepository();
+    GrpcServices services = GrpcServices.over(repository);
     // Mimics Spring gRPC's exception-handler interceptor, which maps thrown exceptions to a
     // status in the running server.
     IncidentGrpcExceptionHandler exceptionHandler = new IncidentGrpcExceptionHandler();
     grpcService =
         new IncidentGrpcService(
-            new CreateIncidentService(repository), new CloseIncidentService(repository)) {
+            services.create,
+            services.acknowledge,
+            services.escalate,
+            services.close,
+            services.query) {
           @Override
           public void createIncident(
               CreateIncidentRequest request,
@@ -123,8 +126,7 @@ class IncidentGrpcServiceTest {
 
   @Test
   void toGrpcStatus_mapsClosed() {
-    assertThat(
-            IncidentGrpcService.toGrpcStatus(com.coldguard.incident.domain.IncidentStatus.CLOSED))
+    assertThat(IncidentGrpcMapper.status(com.coldguard.incident.domain.IncidentStatus.CLOSED))
         .isEqualTo(IncidentStatus.CLOSED);
   }
 
@@ -204,16 +206,18 @@ class IncidentGrpcServiceTest {
 
   private Incident newStoredIncident(String id) {
     Incident incident =
-        new Incident(
-            id,
-            "asset-1",
-            "sensor-1",
-            "high-temperature",
-            com.coldguard.incident.domain.Impact.HIGH,
-            com.coldguard.incident.domain.Urgency.HIGH,
-            com.coldguard.incident.domain.Priority.P2,
-            com.coldguard.incident.domain.IncidentStatus.CREATED,
-            java.time.Instant.now());
+        com.coldguard.incident.domain.Incident.open(
+                java.util.UUID.nameUUIDFromBytes(id.getBytes()).toString(),
+                "asset-1",
+                "sensor-1",
+                "high-temperature",
+                com.coldguard.incident.domain.Criticality.HIGH,
+                com.coldguard.incident.domain.Magnitude.HIGH,
+                false,
+                null,
+                com.coldguard.incident.domain.DomainFixtures.SLA,
+                java.time.Clock.systemUTC())
+            .incident();
     repository.save(incident);
     return incident;
   }
@@ -229,21 +233,23 @@ class IncidentGrpcServiceTest {
   }
 
   private static final class InMemoryIncidentRepository implements IncidentRepository {
-    private final ConcurrentHashMap<String, String> openIncidentIdByKey = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Incident> incidentsById = new ConcurrentHashMap<>();
 
     @Override
     public void save(Incident incident) {
-      String key = incident.assetId() + "|" + incident.sensorId() + "|" + incident.anomalyType();
-      openIncidentIdByKey.putIfAbsent(key, incident.id());
       incidentsById.put(incident.id(), incident);
     }
 
     @Override
-    public Optional<String> findOpenIncidentId(
-        String assetId, String sensorId, String anomalyType) {
-      return Optional.ofNullable(
-          openIncidentIdByKey.get(assetId + "|" + sensorId + "|" + anomalyType));
+    public Optional<Incident> findOpen(String assetId, String sensorId, String anomalyType) {
+      return incidentsById.values().stream()
+          .filter(i -> i.status().isOpen())
+          .filter(
+              i ->
+                  i.assetId().equals(assetId)
+                      && i.sensorId().equals(sensorId)
+                      && i.anomalyType().equals(anomalyType))
+          .findFirst();
     }
 
     @Override
@@ -254,6 +260,15 @@ class IncidentGrpcServiceTest {
     @Override
     public void update(Incident incident) {
       incidentsById.put(incident.id(), incident);
+    }
+
+    @Override
+    public com.coldguard.incident.application.PageResult<Incident> search(
+        com.coldguard.incident.application.IncidentSearch search,
+        com.coldguard.incident.application.PageQuery page) {
+      java.util.List<Incident> all = new java.util.ArrayList<>(incidentsById.values());
+      return new com.coldguard.incident.application.PageResult<>(
+          all, page.page(), page.size(), all.size());
     }
   }
 

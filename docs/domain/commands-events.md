@@ -35,6 +35,17 @@ evento, no un diseño de base de datos ni un contrato serializado final.
 - `AssetRegistered` está asociado explícitamente a CU-001 (`docs/domain/use-cases.md`); sigue sin
   un consumidor confirmado, señalado, no resuelto aquí.
 
+- Una anomalía equivalente (mismo activo, sensor y tipo) sobre un incidente abierto **no emite
+  evento**: actualiza el incidente (contador de ocurrencias, urgencia sin desescalar y, si cambia
+  la prioridad, los vencimientos de SLA) y queda en el Audit Log (`OCCURRENCE_REGISTERED`,
+  `PRIORITY_RECALCULATED`; RN-005, RN-014).
+- `NotificationRequested` solo se emite si hay al menos un destinatario habilitado con el rol
+  correspondiente (placeholder académico, DEC-018); si no, se registra un aviso sin datos
+  personales y se incrementa la métrica `coldguard.notification.recipients.missing`.
+- El Audit Log recibe los eventos de Asset, Telemetry y Notification por la cola
+  `incident-service.audit`; los de Incident e Identity se escriben en proceso. Un evento sin
+  mapeo explícito va a la DLQ.
+
 ## TODO
 
 - Periodicidad/frecuencia esperada configurable que determina cuándo se considera "pérdida de

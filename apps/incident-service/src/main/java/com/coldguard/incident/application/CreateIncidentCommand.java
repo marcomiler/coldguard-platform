@@ -1,13 +1,6 @@
 package com.coldguard.incident.application;
 
-import com.coldguard.incident.domain.Criticality;
-import com.coldguard.incident.domain.Magnitude;
+import com.coldguard.commons.security.Actor;
 
-public record CreateIncidentCommand(
-    String assetId,
-    Criticality assetCriticality,
-    String sensorId,
-    String anomalyType,
-    Magnitude magnitude,
-    boolean persistent,
-    String correlationId) {}
+/** {@code actor} is null when the call carried no trusted identity. */
+public record CreateIncidentCommand(OpenIncidentCommand anomaly, Actor actor) {}

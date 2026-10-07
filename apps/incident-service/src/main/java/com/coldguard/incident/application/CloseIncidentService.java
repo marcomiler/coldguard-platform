@@ -1,46 +1,39 @@
 package com.coldguard.incident.application;
 
+import com.coldguard.commons.messaging.EventActor;
 import com.coldguard.commons.security.Actor;
 import com.coldguard.commons.security.Role;
+import com.coldguard.incident.domain.CloseEvidence;
 import com.coldguard.incident.domain.Incident;
+import com.coldguard.incident.domain.Transition;
+import java.time.Clock;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * {@code cause} and {@code resolutionComment} are required (RN-007) and validated as non-blank
- * here, but are not persisted yet — {@link Incident} and its JPA mapping have no columns for them.
- * Once validated they are discarded; a future migration is required to store them durably (needed
- * for RN-008 auditability once an audit log exists).
- */
 @Service
 public class CloseIncidentService {
 
-  private final IncidentRepository incidentRepository;
+  private final IncidentRepository repository;
+  private final IncidentEventPublisher events;
+  private final Clock clock;
 
-  public CloseIncidentService(IncidentRepository incidentRepository) {
-    this.incidentRepository = incidentRepository;
+  CloseIncidentService(IncidentRepository repository, IncidentEventPublisher events, Clock clock) {
+    this.repository = repository;
+    this.events = events;
+    this.clock = clock;
   }
 
+  @Transactional
   public Incident close(CloseIncidentCommand command) {
-    Actor actor = command.actor();
-    if (actor == null || !actor.hasRole(Role.MAINTENANCE_TECHNICIAN)) {
-      throw new IncidentCloseForbiddenException(actor);
-    }
-    requireNonBlank(command.cause(), "cause is required");
-    requireNonBlank(command.resolutionComment(), "resolutionComment is required");
-
+    Actor actor = Authorization.require(command.actor(), Role.MAINTENANCE_TECHNICIAN);
+    CloseEvidence evidence = new CloseEvidence(command.cause(), command.resolutionComment());
     Incident incident =
-        incidentRepository
+        repository
             .findById(command.incidentId())
             .orElseThrow(() -> new IncidentNotFoundException(command.incidentId()));
-
-    Incident closed = incident.close();
-    incidentRepository.update(closed);
-    return closed;
-  }
-
-  private static void requireNonBlank(String value, String message) {
-    if (value == null || value.isBlank()) {
-      throw new IllegalArgumentException(message);
-    }
+    Transition transition = incident.close(actor.id(), evidence, clock);
+    repository.update(transition.incident());
+    events.publish(transition.event(), EventActor.user(actor.id()));
+    return transition.incident();
   }
 }

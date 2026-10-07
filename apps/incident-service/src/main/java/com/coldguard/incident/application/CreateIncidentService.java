@@ -1,70 +1,48 @@
 package com.coldguard.incident.application;
 
-import com.coldguard.incident.domain.Impact;
+import com.coldguard.commons.messaging.EventActor;
+import com.coldguard.commons.security.Actor;
 import com.coldguard.incident.domain.Incident;
 import com.coldguard.incident.domain.IncidentAlreadyOpenException;
-import com.coldguard.incident.domain.IncidentStatus;
-import com.coldguard.incident.domain.Priority;
-import com.coldguard.incident.domain.Urgency;
-import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 
+/**
+ * Technical, manual creation: refuses to duplicate an open incident. Not itself transactional: the
+ * insert runs in {@link IncidentOpener}'s transaction, so after a lost race (which aborts that
+ * transaction) the winner can still be looked up.
+ */
 @Service
 public class CreateIncidentService {
 
-  private final IncidentRepository incidentRepository;
+  private final IncidentRepository repository;
+  private final IncidentOpener opener;
 
-  public CreateIncidentService(IncidentRepository incidentRepository) {
-    this.incidentRepository = incidentRepository;
+  CreateIncidentService(IncidentRepository repository, IncidentOpener opener) {
+    this.repository = repository;
+    this.opener = opener;
   }
 
   public Incident create(CreateIncidentCommand command) {
-    incidentRepository
-        .findOpenIncidentId(command.assetId(), command.sensorId(), command.anomalyType())
+    OpenIncidentCommand anomaly = command.anomaly();
+    repository
+        .findOpen(anomaly.assetId(), anomaly.sensorId(), anomaly.anomalyType())
         .ifPresent(
-            existingId -> {
-              throw new IncidentAlreadyOpenException(existingId);
+            existing -> {
+              throw new IncidentAlreadyOpenException(existing.id());
             });
-
-    Impact impact = PriorityCalculator.impactFrom(command.assetCriticality());
-    Urgency urgency = PriorityCalculator.urgencyFrom(command.magnitude(), command.persistent());
-    Priority priority = PriorityCalculator.priorityFrom(impact, urgency);
-
-    Incident incident =
-        new Incident(
-            UUID.randomUUID().toString(),
-            command.assetId(),
-            command.sensorId(),
-            command.anomalyType(),
-            impact,
-            urgency,
-            priority,
-            IncidentStatus.CREATED,
-            Instant.now());
-
     try {
-      incidentRepository.save(incident);
-    } catch (DuplicateIncidentException ex) {
-      // Lost a race against a concurrent request for the same asset/sensor/anomaly
-      // type:
-      // the uniqueness constraint is the final authority, re-read the winning
-      // incident id.
-      String existingId = findExistingId(command, ex);
-      throw new IncidentAlreadyOpenException(existingId);
+      return opener.open(anomaly, eventActor(command.actor()));
+    } catch (DuplicateIncidentException lostRace) {
+      // The unique index is the final authority; report the winner.
+      throw new IncidentAlreadyOpenException(
+          repository
+              .findOpen(anomaly.assetId(), anomaly.sensorId(), anomaly.anomalyType())
+              .map(Incident::id)
+              .orElseThrow(() -> lostRace));
     }
-
-    return incident;
   }
 
-  private String findExistingId(CreateIncidentCommand command, DuplicateIncidentException cause) {
-    Optional<String> existingId =
-        incidentRepository.findOpenIncidentId(
-            command.assetId(), command.sensorId(), command.anomalyType());
-    if (existingId.isEmpty()) {
-      throw cause;
-    }
-    return existingId.get();
+  static EventActor eventActor(Actor actor) {
+    return actor == null ? EventActor.system("incident-api") : EventActor.user(actor.id());
   }
 }
