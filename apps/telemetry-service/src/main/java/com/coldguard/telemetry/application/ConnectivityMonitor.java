@@ -2,12 +2,11 @@ package com.coldguard.telemetry.application;
 
 import com.coldguard.commons.messaging.EventActor;
 import com.coldguard.commons.messaging.outbox.DomainEventPublisher;
+import com.coldguard.commons.observability.BusinessEventLogger;
 import com.coldguard.telemetry.domain.SensorCondition;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -20,11 +19,10 @@ public class ConnectivityMonitor {
 
   static final EventActor ACTOR = EventActor.system("connectivity-monitor");
 
-  private static final Logger log = LoggerFactory.getLogger(ConnectivityMonitor.class);
-
   private final SensorConditionRepository conditions;
   private final DomainEventPublisher events;
   private final ConnectivityMetrics metrics;
+  private final BusinessEventLogger businessEvents;
   private final Clock clock;
   private final TransactionTemplate transaction;
   private final double toleranceFactor;
@@ -34,6 +32,7 @@ public class ConnectivityMonitor {
       SensorConditionRepository conditions,
       DomainEventPublisher events,
       ConnectivityMetrics metrics,
+      BusinessEventLogger businessEvents,
       Clock clock,
       PlatformTransactionManager transactionManager,
       double toleranceFactor,
@@ -41,6 +40,7 @@ public class ConnectivityMonitor {
     this.conditions = conditions;
     this.events = events;
     this.metrics = metrics;
+    this.businessEvents = businessEvents;
     this.clock = clock;
     this.transaction = new TransactionTemplate(transactionManager);
     this.toleranceFactor = toleranceFactor;
@@ -71,12 +71,11 @@ public class ConnectivityMonitor {
       conditions.save(condition.connectivityLost(now));
       events.publish(TelemetryEvents.connectivityLost(condition, now, ACTOR));
       metrics.connectivityLost();
-      log.warn(
-          "Sensor {} of asset {} stopped reporting (last reading {}, expected every {}s)",
-          condition.sensorId(),
-          condition.assetId(),
-          condition.lastReadingAt(),
-          condition.expectedIntervalSeconds());
+      businessEvents.log(
+          "SensorConnectivityLost",
+          java.util.Map.of(
+              "sensorId", condition.sensorId().toString(),
+              "assetId", condition.assetId().toString()));
     }
     return overdue.size();
   }

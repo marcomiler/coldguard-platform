@@ -310,6 +310,11 @@ cloud.
     aparece en logs, trazas o eventos de negocio.
   - Esta historia no se marca como terminada hasta que exista evidencia verificable (código y
     capturas), no solo diseño documental.
+  - **Estado técnico: implementada en el stack local (SPEC-011)**: métricas en Prometheus, trazas
+    en Tempo (propagación por gRPC y por el Outbox), logs JSON en Loki, eventos de negocio después
+    del commit, tres dashboards provisionados. Verificado: `deploy/scripts/smoke-e2e.sh` en verde,
+    todos los targets de Prometheus `UP` y ningún patrón de token, contraseña, cabecera de
+    autorización o correo en los logs. **Evidencia académica: pendiente** (capturas).
 - Prioridad: Should have.
 - Estimación: por estimar; división recomendada (por servicio o por señal), **no aprobada ni
   ejecutada en esta ronda** — se decide en el refinamiento previo a Sprint 5, no antes

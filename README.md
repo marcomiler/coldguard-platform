@@ -67,20 +67,24 @@ Requisitos: JDK 25, Maven 4.1+, Docker y Docker Compose.
    deploy/scripts/generate-dev-certs.sh
    ```
 
-4. Levantar el stack local (PostgreSQL, RabbitMQ, Mailpit y los 5 servicios backend):
+4. Levantar el stack local (PostgreSQL, RabbitMQ, Mailpit y los servicios backend). Los pasos 2 y
+   3 los hace solos el script si faltan:
 
    ```bash
-   docker compose --env-file deploy/local/.env -f deploy/local/docker-compose.yml up --build
+   deploy/scripts/up.sh                                        # stack base
+   deploy/scripts/up.sh --with-observability --with-simulator  # + Prometheus/Grafana/Loki/Tempo + simulador
+   deploy/scripts/seed-demo.sh                                 # datos de demostración (por el Gateway)
+   deploy/scripts/smoke-e2e.sh                                 # verificación extremo a extremo
+   deploy/scripts/down.sh                                      # detener (--purge borra volúmenes, con confirmación)
    ```
 
-   Observabilidad (Prometheus, Grafana, Loki) es opcional, con su propio perfil:
-
-   ```bash
-   docker compose --env-file deploy/local/.env -f deploy/local/docker-compose.yml --profile observability up -d
-   ```
+   Perfiles de Compose: `observability` (Prometheus, Grafana, Loki, Tempo, OpenTelemetry Collector,
+   Alloy) y `sim` (Sensor Simulator). Operación y diagnóstico: `docs/operations/runbooks.md`.
 
    Puertos publicados: Gateway `8080`, PostgreSQL `5432`, RabbitMQ `5672`/consola `15672`, Mailpit
-   UI `8025`, y con el perfil `observability` Prometheus `9090`, Grafana `3000`, Loki `3100`.
+   UI `8025`, y con el perfil `observability` Prometheus `9090`, Grafana `3000`, Loki `3100`. Los
+   puertos HTTP de Actuator (`/actuator/prometheus`) son internos: Asset `8081`, Telemetry `8082`,
+   Incident `8083`, Notification `8084`, Simulador `8085`.
    Puertos gRPC internos (nunca publicados): Asset `9091`, Telemetry `9092`, Incident `9093`.
    Actuator del Gateway: `8090` (solo dentro de la red de Compose).
 
@@ -124,11 +128,10 @@ docker compose -f deploy/local/docker-compose.yml down
 
 ### Quick test
 
-```bash
-curl -i -X POST http://localhost:8080/api/v1/incidents \
-  -H "Content-Type: application/json" \
-  -d '{"assetId":"asset-1","assetCriticality":"CRITICALITY_HIGH","sensorId":"sensor-1","anomalyType":"high-temperature","magnitude":"MAGNITUDE_HIGH","persistent":false,"correlationId":"corr-1"}'
-```
+Con el stack arriba y sembrado, `deploy/scripts/smoke-e2e.sh` recorre login por rol, una lectura
+fuera de rango, el incidente, su reconocimiento, escalamiento y cierre, los correos, la bitácora y
+las métricas, y sale con código distinto de cero ante cualquier fallo. La API REST está descrita en
+`contracts/rest/openapi.yaml`.
 
 ## Scripts locales (bootstrap y validación)
 

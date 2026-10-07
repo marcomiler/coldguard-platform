@@ -24,6 +24,7 @@ class ConnectivityMonitorTest {
         f.store.conditionRepository,
         f.events,
         () -> lostMetric++,
+        new com.coldguard.commons.observability.BusinessEventLogger(),
         clock,
         new NoOpTransactionManager(),
         1.5,

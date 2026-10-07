@@ -699,6 +699,15 @@ RF-008, RF-009, RF-018; CU-003, CU-005, CU-009; RN-008, RN-011, RN-018, RN-020;
 ### Consecuencias
 - Cambiar el destino a Application Insights en la fase Azure solo exige reconfigurar el collector.
 - Cierra el TODO de `docker-strategy.md` y `deployment-view.md`. No se crean recursos Azure.
+### Implementación (SPEC-011)
+- Verificado contra Spring Boot 4.1.1: `spring-boot-starter-opentelemetry` (sin el registro OTLP de
+  métricas, excluido porque las métricas se raspan), observación de Spring gRPC servidor/cliente y de
+  los listeners de Spring AMQP; Grafana Alloy sustituye a Promtail. Imágenes: collector 0.114.0,
+  Tempo 2.6.1, Alloy 1.5.1.
+- La observación de `RabbitTemplate` se deja apagada: el relay del Outbox publica desde un hilo sin
+  traza y pisaría el `traceparent` guardado con el evento.
+- El contador de incidentes creados se llama `coldguard.incident.opened` (el sufijo `_created` está
+  reservado por el cliente de Prometheus).
 ### Trazabilidad
 RNF-002, RNF-004, RNF-008; `docs/operations/observability-strategy.md`; HU-021.
 

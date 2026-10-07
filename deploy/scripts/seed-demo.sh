@@ -171,3 +171,6 @@ jq -n --arg org "$ORG" --arg site "$SITE" \
 echo
 echo "Done: $CREATED created, $REUSED reused."
 echo "Ids written to ${OUTPUT_FILE#"$REPO_ROOT"/} (not versioned)."
+
+# The Sensor Simulator reads its scenario from the ids just written.
+"$REPO_ROOT/deploy/scripts/generate-simulator-scenario.sh"

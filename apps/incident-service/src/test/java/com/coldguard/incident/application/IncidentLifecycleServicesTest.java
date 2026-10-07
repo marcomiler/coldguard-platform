@@ -39,7 +39,7 @@ class IncidentLifecycleServicesTest {
   private final FixedRecipients recipients = new FixedRecipients();
   private final CapturedAudit audit = new CapturedAudit();
   private final IncidentEventPublisher events =
-      new IncidentEventPublisher(captured, recipients, new IncidentAuditTrail(audit));
+      new IncidentEventPublisher(captured, recipients, new IncidentAuditTrail(audit), event -> {});
   private final IncidentOpener opener = new IncidentOpener(incidents, SLA, events, CLOCK);
 
   private final CreateIncidentService create = new CreateIncidentService(incidents, opener);

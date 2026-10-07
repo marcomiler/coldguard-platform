@@ -5,6 +5,8 @@ server:
 spring:
   application:
     name: gateway
+  config:
+    import: optional:classpath:coldguard-observability.yml
   threads:
     virtual:
       enabled: true
@@ -78,11 +80,3 @@ management:
     # Separate port so actuator is reachable inside the Compose network but is not part of the
     # public REST surface published on 8080.
     port: ${MANAGEMENT_PORT:8090}
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      probes:
-        enabled: true

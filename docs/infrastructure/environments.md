@@ -19,7 +19,8 @@ recurso Azure).
 - **Variables esperadas por servicio (nombres, sin valores)**:
   - Todos los servicios backend: `SPRING_PROFILES_ACTIVE=local`, credenciales de conexión a
     PostgreSQL (host, puerto, base de datos, usuario, contraseña), credenciales de conexión a
-    RabbitMQ (host, puerto, usuario, contraseña), endpoint de exportación OpenTelemetry.
+    RabbitMQ (host, puerto, usuario, contraseña), `TRACING_EXPORT_ENABLED` y
+    `OTEL_TRACES_ENDPOINT` (exportación de trazas; los fija Compose).
   - `notification-service`: host/puerto SMTP de Mailpit.
   - `gateway`: puertos/URLs internas de Asset Service e Incident Service (gRPC).
   - Exactas por servicio: pendientes de `.env.example`, no fijadas en este documento (evita

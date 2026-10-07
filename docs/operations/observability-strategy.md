@@ -89,9 +89,25 @@ son condiciones candidatas a alerta, sujetas a validación durante la implementa
 > están sujetos a validación durante la implementación. No se afirma que exista ninguna alerta
 > activa, dashboard activo, métrica real ni resultado de prueba de rendimiento.
 
+## Estado de la implementación local
+
+Implementado y verificado en el stack local (`deploy/scripts/up.sh --with-observability`):
+
+| Señal | Cómo está |
+|---|---|
+| Métricas | `micrometer-registry-prometheus` en todos los módulos; `/actuator/prometheus` con las etiquetas `application` y `environment`; histogramas solo para HTTP servidor, gRPC y consumidores AMQP; broker por `rabbitmq_prometheus` (profundidad por cola y DLQ). Métricas propias: `coldguard.outbox.*`, `coldguard.telemetry.readings`, `coldguard.telemetry.connectivity.lost`, `coldguard.asset.calibration.expired`, `coldguard.incident.opened/acknowledged/escalated/closed{priority}`, `coldguard.notification.sent/failed{category}/recipients.missing`, `coldguard.simulator.readings.*`. Ninguna etiqueta lleva ids de alta cardinalidad. El contador de incidentes creados se llama `opened`: el cliente de Prometheus reserva el sufijo `_created` |
+| Trazas | Spring Boot + OpenTelemetry por OTLP/HTTP al Collector (100 % local, `TRACING_EXPORT_ENABLED`). Una traza cruza el Gateway → Incident por gRPC y Simulador → Telemetry → RabbitMQ → Incident: el Outbox guarda el `traceparent` del productor y el relay lo envía como header (la observación de `RabbitTemplate` está apagada a propósito para no pisarlo). No se trazan `/actuator/**` ni el relay/limpieza del Outbox |
+| Logs | JSON por línea en stdout (`logging.structured.format.console=logstash`), con `traceId`, `spanId` y `correlationId`; nivel por `LOGGING_LEVEL_COM_COLDGUARD`; no se registran cuerpos de petición |
+| Eventos de negocio | `BusinessEventLogger` (commons) escribe una línea estructurada (`event.name`, ids, prioridad) **después del commit**; un cambio revertido no deja rastro |
+| Salud | `liveness` y `readiness`; `readiness` incluye solo dependencias propias (base de datos y broker), nunca otros servicios; el correo no forma parte de ninguno |
+| Grafana | Datasources (Prometheus, Loki, Tempo, con enlace `traceId` → Tempo) y tres dashboards (*Services overview*, *Messaging*, *Business*) provisionados desde `observability/grafana/` |
+
+No hay reglas de alerta: los umbrales no están aprobados; los dashboards muestran las cinco
+condiciones candidatas para revisión manual.
+
 ## Qué no afirma este documento
 
 No existe suscripción Azure operativa, Application Insights, Log Analytics, Azure Monitor,
 Prometheus administrado, Grafana administrado, Key Vault, pipeline de GitHub Actions operativo,
-métricas reales, dashboards activos, alertas activas, costos ni resultados de pruebas. Todo lo
-descrito aquí es diseño previsto, no evidencia de implementación.
+alertas activas, costos ni resultados de pruebas de rendimiento. Lo implementado es solo el stack
+**local** descrito arriba; el destino Azure sigue siendo diseño previsto.

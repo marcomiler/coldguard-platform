@@ -3,6 +3,8 @@ package com.coldguard.commons;
 import com.coldguard.commons.correlation.CorrelationIdFilter;
 import com.coldguard.commons.grpc.CorrelationClientInterceptor;
 import com.coldguard.commons.grpc.CorrelationServerInterceptor;
+import com.coldguard.commons.observability.BusinessEventLogger;
+import com.coldguard.commons.observability.NoiseFreeObservations;
 import com.coldguard.commons.security.ActorServerInterceptor;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -91,6 +93,34 @@ public class CommonsAutoConfiguration {
               .map(String::strip)
               .filter(name -> !name.isEmpty())
               .collect(Collectors.toUnmodifiableSet()));
+    }
+  }
+
+  /** The logger of business events (written after commit); only where Spring TX is present. */
+  @Configuration(proxyBeanMethods = false)
+  @ConditionalOnClass(name = "org.springframework.transaction.support.TransactionSynchronization")
+  static class BusinessEvents {
+
+    @Bean
+    @ConditionalOnMissingBean
+    BusinessEventLogger businessEventLogger() {
+      return new BusinessEventLogger();
+    }
+  }
+
+  /** Drops the observations that would only add noise to the traces (see the class). */
+  @Configuration(proxyBeanMethods = false)
+  @ConditionalOnClass(
+      name = {
+        "io.micrometer.observation.ObservationPredicate",
+        "org.springframework.scheduling.support.ScheduledTaskObservationContext"
+      })
+  static class TraceNoise {
+
+    @Bean
+    @ConditionalOnMissingBean
+    NoiseFreeObservations noiseFreeObservations() {
+      return new NoiseFreeObservations();
     }
   }
 }

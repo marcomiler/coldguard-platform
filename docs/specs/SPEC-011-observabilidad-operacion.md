@@ -199,3 +199,32 @@ la causa); reset de datos locales; dónde mirar cada señal en Grafana.
   después.
 - El stack completo (6 servicios + 9 contenedores de infraestructura/observabilidad) es exigente
   en memoria: los perfiles de Compose permiten levantar solo lo necesario.
+
+## Avance
+
+Implementado y verificado en el stack local:
+
+- **Métricas**: `micrometer-registry-prometheus` y `spring-boot-starter-opentelemetry` como
+  dependencias del `pom.xml` raíz (se excluye `micrometer-registry-otlp`: las métricas se raspan y
+  arrastra `opentelemetry-proto`, que choca con el protobuf de gRPC). Valores por defecto en
+  `libs/coldguard-commons/src/main/resources/coldguard-observability.yml` (el simulador, que no usa
+  commons, los repite). Métricas nuevas: `coldguard.incident.opened/acknowledged/escalated/closed`
+  (el de creación se llama `opened`: el cliente de Prometheus reserva el sufijo `_created`) y
+  `coldguard.notification.sent/failed`.
+- **Trazas**: Collector → Tempo; propagación verificada Gateway → Incident (gRPC) y Simulador →
+  Telemetry → RabbitMQ → Incident (el Outbox ya guardaba el `traceparent`; la observación de
+  `RabbitTemplate` queda apagada para no pisarlo). Un `ObservationPredicate` común descarta
+  `/actuator/**` y el relay/limpieza del Outbox.
+- **Logs**: JSON `logstash` por línea; Alloy → Loki; `BusinessEventLogger` post-commit.
+- **Salud**: `readiness` = estado + `db` + `rabbit` (nunca otros servicios); correo fuera.
+- **Grafana**: datasources con enlace `traceId` → Tempo y tres dashboards provisionados; no hay
+  reglas de alerta.
+- **Scripts**: `up.sh`, `down.sh`, `smoke-e2e.sh`, `backup-db.sh`; `seed-demo.sh` genera además el
+  escenario del simulador. Runbook completo en `docs/operations/runbooks.md`.
+- **Cierre documental**: `tech-stack.md`, `observability-strategy.md`, `docker-strategy.md`,
+  `deployment-view.md`, `data-flow.md`, `event-flow.md`, `environments.md`, `capacity-plan.md`,
+  `backup-recovery-plan.md`, HU-021, DEC-019, `.claude/rules/java-spring.md` y `README.md`.
+
+Criterios verificados: 1 (`up.sh --with-observability --with-simulator`), 2 (traza y enlace desde el
+log), 3 (`smoke-e2e.sh` termina en 0 y falla con código ≠ 0 ante un error), 4 (Loki sin patrones de
+token, `password`, `Authorization` ni correos), 5 (Prometheus: todos los targets `UP`).

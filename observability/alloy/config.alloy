@@ -1,0 +1,32 @@
+// Reads the stdout of the ColdGuard service containers (one JSON object per line) and ships it to
+// Loki. Only the Compose services of the platform are collected, labelled by service name.
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "coldguard" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "gateway|asset-service|telemetry-service|incident-service|notification-service|sensor-simulator"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "coldguard" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.coldguard.output
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
