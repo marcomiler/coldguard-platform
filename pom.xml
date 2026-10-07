@@ -44,6 +44,7 @@
     <module>apps/telemetry-service</module>
     <module>apps/incident-service</module>
     <module>apps/notification-service</module>
+    <module>simulator/sensor-simulator</module>
   </modules>
 
   <!-- Only dependencies used by every service module without exception are declared in

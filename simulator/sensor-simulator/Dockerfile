@@ -13,9 +13,9 @@ COPY apps/notification-service/pom.xml /workspace/apps/notification-service/pom.
 COPY simulator/sensor-simulator/pom.xml /workspace/simulator/sensor-simulator/pom.xml
 COPY contracts /workspace/contracts
 COPY libs/coldguard-commons/src /workspace/libs/coldguard-commons/src
-COPY apps/incident-service/src /workspace/apps/incident-service/src
+COPY simulator/sensor-simulator/src /workspace/simulator/sensor-simulator/src
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -q -B -f /workspace/pom.xml -pl apps/incident-service -am package -DskipTests -Dspotless.check.skip=true
+    mvn -q -B -f /workspace/pom.xml -pl simulator/sensor-simulator -am package -DskipTests -Dspotless.check.skip=true
 
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
@@ -27,7 +27,7 @@ WORKDIR /app
 # without widening access to other host accounts.
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
     && useradd --system --gid 1000 --create-home --home-dir /app --uid 1001 spring
-COPY --from=build /workspace/apps/incident-service/target/*.jar /app/app.jar
+COPY --from=build /workspace/simulator/sensor-simulator/target/*.jar /app/app.jar
 RUN chown -R spring:1000 /app
 
 USER spring

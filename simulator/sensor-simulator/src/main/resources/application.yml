@@ -1,0 +1,54 @@
+server:
+  port: 8085
+  shutdown: graceful
+
+spring:
+  application:
+    name: sensor-simulator
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:10s}
+  config:
+    # The generated scenario (deploy/scripts/generate-simulator-scenario.sh); optional so the
+    # service can start without it when disabled.
+    import: optional:file:${SIMULATOR_SCENARIO_FILE:./scenario.yml}
+  grpc:
+    client:
+      channels:
+        telemetry-service:
+          address: static://${TELEMETRY_SERVICE_HOST:localhost}:${TELEMETRY_SERVICE_GRPC_PORT:9092}
+          ssl:
+            enabled: true
+            # mTLS as the client `sensor-simulator`: Telemetry accepts it for ingestion only.
+            bundle: simulator-client
+  ssl:
+    bundle:
+      pem:
+        simulator-client:
+          keystore:
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/sensor-simulator/sensor-simulator.crt
+            private-key: file:${TLS_CERTS_DIR:../../deploy/local/certs}/sensor-simulator/sensor-simulator.key
+          truststore:
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/ca/ca.crt
+
+# Demonstration placeholders (academic): see deploy/local/simulator/scenario.example.yml.
+coldguard:
+  simulator:
+    enabled: ${SIMULATOR_ENABLED:true}
+    tick-interval: 1s
+    max-batch-size: 200
+    deadline: 5s
+    buffer:
+      max-pending-readings: 5000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

@@ -139,3 +139,15 @@ Sin estado persistente: al reiniciar, los escenarios comienzan de nuevo (aceptab
 
 - El simulador y el perfil del seed deben mantenerse coherentes; un `breach-value` dentro del
   rango no genera anomalías (el seed es la única fuente de umbrales).
+
+## Avance
+
+Implementado en `simulator/sensor-simulator` (módulo del reactor raíz): configuración tipada y
+validada al arrancar (falla con todos los problemas a la vez), un comportamiento por escenario
+(`sealed`, sin estado compartido), planificador por intervalo de sensor, buffer acotado con descarte
+de los más antiguos, reintento con backoff exponencial y los mismos `reading_id`, y cliente gRPC con
+mTLS como `sensor-simulator`. El archivo de escenario lo genera
+`deploy/scripts/generate-simulator-scenario.sh` a partir de `demo-seed.json` (no se versiona; la
+plantilla es `deploy/local/simulator/scenario.example.yml`). Compose: perfil `sim`
+(`docker compose --profile sim up -d`). Métricas Micrometer: `coldguard.simulator.readings.sent`,
+`.dropped` y `.rejected`.

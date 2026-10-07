@@ -10,6 +10,7 @@ COPY apps/asset-service/pom.xml /workspace/apps/asset-service/pom.xml
 COPY apps/telemetry-service/pom.xml /workspace/apps/telemetry-service/pom.xml
 COPY apps/incident-service/pom.xml /workspace/apps/incident-service/pom.xml
 COPY apps/notification-service/pom.xml /workspace/apps/notification-service/pom.xml
+COPY simulator/sensor-simulator/pom.xml /workspace/simulator/sensor-simulator/pom.xml
 COPY contracts /workspace/contracts
 COPY libs/coldguard-commons/src /workspace/libs/coldguard-commons/src
 COPY apps/notification-service/src /workspace/apps/notification-service/src

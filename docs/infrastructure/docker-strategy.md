@@ -6,7 +6,7 @@ requiere ningún servicio cloud para ejecutarlo. Comandos de arranque en
 (servicios, redes, volúmenes, variables de entorno). Implementado en SPEC-001: un `Dockerfile` por
 servicio con plantilla común, healthchecks de readiness, `depends_on` con `service_healthy`,
 imágenes de infraestructura con versión fija, límite de memoria por servicio Java y perfil
-`observability` opcional. El servicio `sensor-simulator` llega con SPEC-010.
+`observability` opcional. El servicio `sensor-simulator` está en el perfil `sim` (`docker compose --profile sim up -d`), con su escenario generado por `deploy/scripts/generate-simulator-scenario.sh`.
 
 ## Servicios previstos
 
