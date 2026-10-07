@@ -1,0 +1,48 @@
+# Template of the Sensor Simulator scenario. The real file, deploy/local/simulator/scenario.yml, is
+# generated with the sensor ids of the seed (deploy/scripts/generate-simulator-scenario.sh) and is
+# not versioned.
+#
+# Every value is an academic placeholder for the demonstration. baseline and breach-value must agree
+# with the profile the seed created for that sensor (the profile is the only source of thresholds):
+# a breach-value inside the range produces no anomaly.
+coldguard:
+  simulator:
+    enabled: true
+    tick-interval: 1s
+    random-seed: 42          # optional: the same seed gives the same sequence of values
+    max-batch-size: 200
+    buffer:
+      max-pending-readings: 5000   # bounds memory while Telemetry is unavailable
+    sensors:
+      # Within the range, forever.
+      - sensor-id: "00000000-0000-0000-0000-000000000001"
+        unit: CELSIUS
+        interval: 5s
+        baseline: 4.0
+        noise: 0.3
+        scenario: NOMINAL
+      # Out of range and staying there: opens an incident that keeps being updated.
+      - sensor-id: "00000000-0000-0000-0000-000000000002"
+        baseline: 4.0
+        scenario: PERSISTENCE
+        breach-value: 11.5
+        start-after: 30s
+      # A couple of out-of-range readings, then back to normal: never persists.
+      - sensor-id: "00000000-0000-0000-0000-000000000003"
+        baseline: 4.0
+        scenario: RECOVERY
+        breach-value: 9.0
+        start-after: 20s
+        breach-readings: 2
+      # A single out-of-range reading.
+      - sensor-id: "00000000-0000-0000-0000-000000000004"
+        baseline: 4.0
+        scenario: OUT_OF_RANGE
+        breach-value: 9.0
+        start-after: 40s
+      # Goes silent, then resumes: Telemetry reports the lost connectivity.
+      - sensor-id: "00000000-0000-0000-0000-000000000005"
+        baseline: 4.0
+        scenario: CONNECTIVITY_LOSS
+        start-after: 60s
+        silence-duration: 5m

@@ -26,7 +26,7 @@ contracts/               # Contratos gRPC/Protobuf y catálogo de eventos versio
 deploy/local/            # docker-compose.yml y .env.example del stack local
 infra/                   # Terraform modular, preparado para Azure, sin aplicar (RNF-007)
 observability/           # Configuración de Prometheus/Grafana/Loki
-simulator/                # Sensor Simulator (fuera de alcance de este scaffolding)
+simulator/                # Sensor Simulator (productor de telemetría de la demo, perfil Compose `sim`)
 docs/                    # Documentación académica, de producto, dominio y arquitectura
 ```
 
