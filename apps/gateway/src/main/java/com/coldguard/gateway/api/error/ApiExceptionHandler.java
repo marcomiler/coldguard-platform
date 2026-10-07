@@ -23,7 +23,13 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
  * a package to {@code basePackages} when another resource adopts these conventions.
  */
 @RestControllerAdvice(
-    basePackages = {"com.coldguard.gateway.api.asset", "com.coldguard.gateway.api.telemetry"})
+    basePackages = {
+      "com.coldguard.gateway.api.asset",
+      "com.coldguard.gateway.api.telemetry",
+      "com.coldguard.gateway.api.incident",
+      "com.coldguard.gateway.api.audit",
+      "com.coldguard.gateway.api.metrics"
+    })
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiExceptionHandler {
 

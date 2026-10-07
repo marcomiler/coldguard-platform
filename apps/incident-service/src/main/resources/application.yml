@@ -40,7 +40,7 @@ spring:
     password: ${DB_PASSWORD:coldguard}
   flyway:
     # The first schema is the default one (history table, unqualified migrations).
-    schemas: incident,identity
+    schemas: incident,identity,auditlog
     create-schemas: true
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
@@ -67,6 +67,22 @@ spring:
       ddl-auto: validate
 
 coldguard:
+  incident:
+    # Academic placeholders (docs/quality/sla-kpi.md), not confirmed business targets.
+    # P4 has no resolution target; its acknowledgement of "1 business day" is approximated by 1 day.
+    sla:
+      P1: { ack: PT5M, resolve: PT30M }
+      P2: { ack: PT15M, resolve: PT2H }
+      P3: { ack: PT1H, resolve: PT8H }
+      P4: { ack: P1D }
+    page:
+      default-size: 20
+      max-size: 100
+  auditlog:
+    query:
+      max-range: 31d
+      default-page-size: 50
+      max-page-size: 200
   identity:
     lockout:
       max-attempts: ${IDENTITY_LOCKOUT_MAX_ATTEMPTS:5}

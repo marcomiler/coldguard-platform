@@ -3,15 +3,21 @@ package com.coldguard.incident.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.coldguard.incident.application.ConcurrentIncidentUpdateException;
 import com.coldguard.incident.application.DuplicateIncidentException;
-import com.coldguard.incident.domain.Impact;
+import com.coldguard.incident.application.IncidentSearch;
+import com.coldguard.incident.application.PageQuery;
+import com.coldguard.incident.application.PageResult;
+import com.coldguard.incident.domain.CloseEvidence;
+import com.coldguard.incident.domain.Criticality;
+import com.coldguard.incident.domain.DomainFixtures;
 import com.coldguard.incident.domain.Incident;
 import com.coldguard.incident.domain.IncidentStatus;
-import com.coldguard.incident.domain.Priority;
-import com.coldguard.incident.domain.Urgency;
-import java.time.Instant;
+import com.coldguard.incident.domain.Magnitude;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -42,14 +48,13 @@ class IncidentRepositoryAdapterTest {
   @Autowired private IncidentRepositoryAdapter adapter;
 
   @Test
-  void save_thenFindOpenIncidentId_returnsSavedIncidentId() {
+  void save_thenFindOpen_returnsSavedIncident() {
     Incident incident = newIncident("asset-it-1", "sensor-it-1", "high-temperature");
 
     adapter.save(incident);
 
-    Optional<String> found =
-        adapter.findOpenIncidentId("asset-it-1", "sensor-it-1", "high-temperature");
-    assertThat(found).contains(incident.id());
+    Optional<Incident> found = adapter.findOpen("asset-it-1", "sensor-it-1", "high-temperature");
+    assertThat(found).map(Incident::id).contains(incident.id());
   }
 
   @Test
@@ -62,9 +67,8 @@ class IncidentRepositoryAdapterTest {
   }
 
   @Test
-  void findOpenIncidentId_noMatch_returnsEmpty() {
-    Optional<String> found =
-        adapter.findOpenIncidentId("no-such-asset", "no-such-sensor", "no-such-type");
+  void findOpen_noMatch_returnsEmpty() {
+    Optional<Incident> found = adapter.findOpen("no-such-asset", "no-such-sensor", "no-such-type");
 
     assertThat(found).isEmpty();
   }
@@ -74,25 +78,23 @@ class IncidentRepositoryAdapterTest {
     Incident first = newIncident("asset-it-3", "sensor-it-3", "high-temperature");
     adapter.save(first);
 
-    adapter.update(first.close());
+    adapter.update(closed(first));
 
     Incident second = newIncident("asset-it-3", "sensor-it-3", "high-temperature");
     adapter.save(second);
 
-    Optional<String> found =
-        adapter.findOpenIncidentId("asset-it-3", "sensor-it-3", "high-temperature");
-    assertThat(found).contains(second.id());
+    Optional<Incident> found = adapter.findOpen("asset-it-3", "sensor-it-3", "high-temperature");
+    assertThat(found).map(Incident::id).contains(second.id());
   }
 
   @Test
-  void findOpenIncidentId_closedIncident_returnsEmpty() {
+  void findOpen_closedIncident_returnsEmpty() {
     Incident incident = newIncident("asset-it-4", "sensor-it-4", "high-temperature");
     adapter.save(incident);
 
-    adapter.update(incident.close());
+    adapter.update(closed(incident));
 
-    Optional<String> found =
-        adapter.findOpenIncidentId("asset-it-4", "sensor-it-4", "high-temperature");
+    Optional<Incident> found = adapter.findOpen("asset-it-4", "sensor-it-4", "high-temperature");
     assertThat(found).isEmpty();
   }
 
@@ -151,16 +153,113 @@ class IncidentRepositoryAdapterTest {
     }
   }
 
+  @Test
+  void save_duplicateWhileAcknowledgedOrEscalated_stillRejected() {
+    Incident first = newIncident("asset-it-6", "sensor-it-6", "high-temperature");
+    adapter.save(first);
+    adapter.update(first.acknowledge("sup-1", Clock.systemUTC()).incident());
+
+    assertThatThrownBy(
+            () -> adapter.save(newIncident("asset-it-6", "sensor-it-6", "high-temperature")))
+        .isInstanceOf(DuplicateIncidentException.class);
+  }
+
+  @Test
+  void update_persistsTheWholeLifecycleAndEvidence() {
+    Incident incident = newIncident("asset-it-7", "sensor-it-7", "high-temperature");
+    adapter.save(incident);
+    Incident stored = adapter.findById(incident.id()).orElseThrow();
+    Incident escalated = stored.escalate("no response", Clock.systemUTC()).incident();
+    adapter.update(escalated);
+    Incident acknowledged =
+        adapter
+            .findById(incident.id())
+            .orElseThrow()
+            .acknowledge("sup-1", Clock.systemUTC())
+            .incident();
+    adapter.update(acknowledged);
+    Incident closedIncident =
+        adapter
+            .findById(incident.id())
+            .orElseThrow()
+            .close("tech-1", new CloseEvidence("overheating", "replaced"), Clock.systemUTC())
+            .incident();
+    adapter.update(closedIncident);
+
+    Incident reloaded = adapter.findById(incident.id()).orElseThrow();
+    assertThat(reloaded.status()).isEqualTo(IncidentStatus.CLOSED);
+    assertThat(reloaded.escalationCount()).isEqualTo(1);
+    assertThat(reloaded.acknowledgedBy()).isEqualTo("sup-1");
+    assertThat(reloaded.cause()).isEqualTo("overheating");
+    assertThat(reloaded.resolutionComment()).isEqualTo("replaced");
+    assertThat(reloaded.closedBy()).isEqualTo("tech-1");
+    assertThat(reloaded.closedAt()).isNotNull();
+    assertThat(reloaded.ackDueAt()).isNotNull();
+  }
+
+  @Test
+  void update_staleVersion_isRejectedAsConcurrentModification() {
+    Incident incident = newIncident("asset-it-8", "sensor-it-8", "high-temperature");
+    adapter.save(incident);
+    Incident first = adapter.findById(incident.id()).orElseThrow();
+    adapter.update(first.escalate("one", Clock.systemUTC()).incident());
+    flush();
+
+    // `first` still carries the version read before the update above.
+    assertThatThrownBy(() -> adapter.update(first.escalate("two", Clock.systemUTC()).incident()))
+        .isInstanceOf(ConcurrentIncidentUpdateException.class);
+  }
+
+  @Test
+  void search_filtersByStatusPriorityAndAsset() {
+    Incident incident = newIncident("asset-it-9", "sensor-it-9", "high-temperature");
+    adapter.save(incident);
+
+    PageResult<Incident> hit =
+        adapter.search(
+            new IncidentSearch(
+                Set.of(IncidentStatus.CREATED),
+                Set.of(incident.priority()),
+                "asset-it-9",
+                null,
+                null,
+                null),
+            new PageQuery(0, 10));
+    PageResult<Incident> miss =
+        adapter.search(
+            new IncidentSearch(Set.of(IncidentStatus.CLOSED), null, "asset-it-9", null, null, null),
+            new PageQuery(0, 10));
+
+    assertThat(hit.items()).extracting(Incident::id).containsExactly(incident.id());
+    assertThat(hit.totalElements()).isEqualTo(1);
+    assertThat(miss.items()).isEmpty();
+  }
+
+  @Autowired private jakarta.persistence.EntityManager entityManager;
+
+  private void flush() {
+    entityManager.flush();
+    entityManager.clear();
+  }
+
+  private static Incident closed(Incident incident) {
+    return incident
+        .close("tech-1", new CloseEvidence("cause", "comment"), Clock.systemUTC())
+        .incident();
+  }
+
   private static Incident newIncident(String assetId, String sensorId, String anomalyType) {
-    return new Incident(
-        UUID.randomUUID().toString(),
-        assetId,
-        sensorId,
-        anomalyType,
-        Impact.HIGH,
-        Urgency.HIGH,
-        Priority.P2,
-        IncidentStatus.CREATED,
-        Instant.now());
+    return Incident.open(
+            UUID.randomUUID().toString(),
+            assetId,
+            sensorId,
+            anomalyType,
+            Criticality.HIGH,
+            Magnitude.HIGH,
+            false,
+            null,
+            DomainFixtures.SLA,
+            Clock.systemUTC())
+        .incident();
   }
 }

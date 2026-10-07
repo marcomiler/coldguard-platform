@@ -2,6 +2,12 @@ package com.coldguard.incident.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.coldguard.commons.security.Role;
+import com.coldguard.incident.application.ActorNotAuthorizedException;
+import com.coldguard.incident.application.ConcurrentIncidentUpdateException;
+import com.coldguard.incident.application.IncidentNotFoundException;
+import com.coldguard.incident.domain.IncidentAlreadyAcknowledgedException;
+import com.coldguard.incident.domain.IncidentAlreadyClosedException;
 import com.coldguard.incident.domain.IncidentAlreadyOpenException;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -37,5 +43,31 @@ class IncidentGrpcExceptionHandlerTest {
     StatusException result = handler.handleException(new RuntimeException("boom"));
 
     assertThat(Status.fromThrowable(result).getCode()).isEqualTo(Status.Code.INTERNAL);
+  }
+
+  @Test
+  void handleException_mapsNotFoundAndPermissionAndConflict() {
+    assertThat(code(new IncidentNotFoundException("i"))).isEqualTo(Status.Code.NOT_FOUND);
+    assertThat(code(new ActorNotAuthorizedException(null, Role.AUDITOR)))
+        .isEqualTo(Status.Code.PERMISSION_DENIED);
+    assertThat(code(new ConcurrentIncidentUpdateException("i", null)))
+        .isEqualTo(Status.Code.ABORTED);
+  }
+
+  @Test
+  void handleException_mapsStateConflicts_toFailedPreconditionWithErrorCode() {
+    StatusException closed = handler.handleException(new IncidentAlreadyClosedException("i"));
+    StatusException acknowledged =
+        handler.handleException(new IncidentAlreadyAcknowledgedException("i"));
+
+    assertThat(Status.fromThrowable(closed).getCode()).isEqualTo(Status.Code.FAILED_PRECONDITION);
+    assertThat(closed.getTrailers().get(IncidentGrpcExceptionHandler.ERROR_CODE_KEY))
+        .isEqualTo("INCIDENT_ALREADY_CLOSED");
+    assertThat(acknowledged.getTrailers().get(IncidentGrpcExceptionHandler.ERROR_CODE_KEY))
+        .isEqualTo("INCIDENT_ALREADY_ACKNOWLEDGED");
+  }
+
+  private Status.Code code(Throwable t) {
+    return Status.fromThrowable(handler.handleException(t)).getCode();
   }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coldguard.commons.security.Role;
+import com.coldguard.incident.auditlog.application.AuditEntry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;

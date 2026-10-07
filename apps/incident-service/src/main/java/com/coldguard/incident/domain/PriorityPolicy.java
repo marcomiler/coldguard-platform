@@ -1,10 +1,4 @@
-package com.coldguard.incident.application;
-
-import com.coldguard.incident.domain.Criticality;
-import com.coldguard.incident.domain.Impact;
-import com.coldguard.incident.domain.Magnitude;
-import com.coldguard.incident.domain.Priority;
-import com.coldguard.incident.domain.Urgency;
+package com.coldguard.incident.domain;
 
 /**
  * Pure, stateless derivation of impact, urgency and priority for a new incident.
@@ -16,9 +10,9 @@ import com.coldguard.incident.domain.Urgency;
  * designed. {@link #priorityFrom(Impact, Urgency)} implements the fixed impact/urgency priority
  * matrix.
  */
-public final class PriorityCalculator {
+public final class PriorityPolicy {
 
-  private PriorityCalculator() {}
+  private PriorityPolicy() {}
 
   public static Impact impactFrom(Criticality criticality) {
     return switch (criticality) {

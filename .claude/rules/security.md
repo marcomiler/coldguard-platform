@@ -5,9 +5,8 @@
   in `SecurityConfig`, anything else is rejected. The role→endpoint table lives in
   `docs/security/authn-authz.md`; `RbacPolicyTest` walks it, so change both together. User
   administration (`/users`) is implemented and requires `PLATFORM_ADMIN` both at the Gateway and
-  in Identity. Still pending: persisting the audit of identity changes (`AuditRecorder` keeps
-  nothing until SPEC-007). Most RBAC routes are
-  declared but their controllers do not exist yet; do not write or review code as if they did.
+  in Identity. Identity changes are audited through `AuditRecorder` into `auditlog.audit_record`.
+  Every route in the RBAC table now has its controller in the Gateway.
 - The Gateway is the sole component that validates the JWT at the edge (ADR-008). Propagation is
   **implemented** (ADR-007, third update): the Gateway sends `x-actor-id` and `x-actor-roles` as
   gRPC metadata over mTLS, and `incident-service` (`ActorServerInterceptor`) accepts it only when
