@@ -1,0 +1,9 @@
+ColdGuard - Incidente escalado
+
+Un incidente de prioridad {{priority}} fue escalado y requiere atencion tecnica.
+
+Incidente: {{incidentId}}
+Activo:    {{assetId}}
+Sensor:    {{sensorId}}
+
+Revise el incidente en ColdGuard y realice el cierre tecnico cuando quede resuelto.

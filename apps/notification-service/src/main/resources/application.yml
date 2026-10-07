@@ -34,6 +34,14 @@ spring:
           initial-interval: 1s
           multiplier: 2
           max-interval: 10s
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    properties:
+      # A slow mail server must never block the consumer indefinitely.
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
   flyway:
     schemas: notification
     create-schemas: true
@@ -43,6 +51,9 @@ spring:
       ddl-auto: none
 
 coldguard:
+  notification:
+    channel: smtp
+    from: ${NOTIFICATION_FROM:coldguard-local@example.invalid}
   outbox:
     enabled: true
     poll-interval: 500ms
@@ -54,6 +65,10 @@ coldguard:
     retention: 7d
 
 management:
+  health:
+    mail:
+      # A mail server that is down must not make the service unready; failures are retried instead.
+      enabled: false
   endpoints:
     web:
       exposure:
