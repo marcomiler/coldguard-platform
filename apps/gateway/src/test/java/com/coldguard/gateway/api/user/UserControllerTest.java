@@ -1,4 +1,4 @@
-package com.coldguard.gateway.api;
+package com.coldguard.gateway.api.user;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -8,15 +8,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.coldguard.gateway.infrastructure.DownstreamCallException;
 import com.coldguard.gateway.infrastructure.IdentityGrpcClient;
 import com.coldguard.gateway.infrastructure.IdentityGrpcClient.UserPage;
 import com.coldguard.gateway.infrastructure.IdentityGrpcClient.UserView;
-import com.coldguard.gateway.infrastructure.IdentityServiceException;
-import com.coldguard.gateway.infrastructure.UserAdministrationException;
-import com.coldguard.gateway.infrastructure.UserAdministrationException.Kind;
+import io.grpc.Status;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,13 +40,19 @@ class UserControllerTest {
           true,
           "2026-10-05T12:00:00Z");
 
+  private static final String VALID_CREATE =
+      """
+      {"username":"marta","email":"marta@example.com","displayName":"Marta",
+       "initialPassword":"long-enough-pw","roles":["AUDITOR"]}
+      """;
+
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private IdentityGrpcClient identity;
 
   @Test
   void list_returnsThePageWithoutAnySecret() throws Exception {
-    given(identity.listUsers(0, 20)).willReturn(new UserPage(List.of(MARTA), 0, 20, 1, 1));
+    given(identity.listUsers(0, 0)).willReturn(new UserPage(List.of(MARTA), 0, 20, 1, 1));
 
     mockMvc
         .perform(get("/api/v1/users"))
@@ -59,28 +65,56 @@ class UserControllerTest {
   }
 
   @Test
-  void create_returns201AndNeverEchoesThePassword() throws Exception {
+  void create_returns201WithLocationAndNeverEchoesThePassword() throws Exception {
     given(
             identity.createUser(
                 "marta", "marta@example.com", "Marta", "long-enough-pw", List.of("AUDITOR")))
         .willReturn(MARTA);
 
     mockMvc
-        .perform(
-            post("/api/v1/users")
-                .contentType("application/json")
-                .content(
-                    """
-                    {"username":"marta","email":"marta@example.com","displayName":"Marta",
-                     "initialPassword":"long-enough-pw","roles":["AUDITOR"]}
-                    """))
+        .perform(post("/api/v1/users").contentType("application/json").content(VALID_CREATE))
         .andExpect(status().isCreated())
+        .andExpect(header().string("Location", "/api/v1/users/" + ID))
         .andExpect(jsonPath("$.userId").value(ID))
         .andExpect(
             content()
                 .string(
                     org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("long-enough-pw"))));
+  }
+
+  @Test
+  void create_validatesTheShapeAndNeverEchoesTheValues() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/users")
+                .contentType("application/json")
+                .content(
+                    """
+                    {"username":" ","email":"not-an-email","displayName":"M",
+                     "initialPassword":"secret-pw-value","roles":[]}
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.errors[?(@.field=='username')]").exists())
+        .andExpect(jsonPath("$.errors[?(@.field=='email')]").exists())
+        .andExpect(jsonPath("$.errors[?(@.field=='roles')]").exists())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("secret-pw-value"))));
+  }
+
+  @Test
+  void create_withAnUnknownRole_isBadRequest() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/users")
+                .contentType("application/json")
+                .content(VALID_CREATE.replace("AUDITOR", "ROOT")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST_BODY"));
   }
 
   @Test
@@ -103,6 +137,23 @@ class UserControllerTest {
   }
 
   @Test
+  void roleChange_requiresARole_andAReason() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/users/" + ID + "/roles")
+                .contentType("application/json")
+                .content("{\"reason\":\"cover\"}"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            post("/api/v1/users/" + ID + "/roles")
+                .contentType("application/json")
+                .content("{\"role\":\"OPERATOR\",\"reason\":\" \"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+  }
+
+  @Test
   void setEnabled_withoutTheFlag_isBadRequest() throws Exception {
     mockMvc
         .perform(
@@ -110,7 +161,8 @@ class UserControllerTest {
                 .contentType("application/json")
                 .content("{\"reason\":\"x\"}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_USER_REQUEST"));
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.errors[0].field").value("enabled"));
   }
 
   @Test
@@ -126,16 +178,19 @@ class UserControllerTest {
   }
 
   @Test
-  void identityRefusalsMapToProblemDetails() throws Exception {
-    check(Kind.FORBIDDEN, 403, "USER_ADMIN_FORBIDDEN");
-    check(Kind.NOT_FOUND, 404, "USER_NOT_FOUND");
-    check(Kind.ALREADY_EXISTS, 409, "USER_ALREADY_EXISTS");
-    check(Kind.CONFLICT, 409, "USER_STATE_CONFLICT");
-    check(Kind.INVALID, 400, "INVALID_USER_REQUEST");
+  void identityRefusalsKeepTheirBusinessCodes() throws Exception {
+    check(Status.Code.PERMISSION_DENIED, null, 403, "FORBIDDEN");
+    check(Status.Code.NOT_FOUND, "USER_NOT_FOUND", 404, "USER_NOT_FOUND");
+    check(Status.Code.ALREADY_EXISTS, "USER_ALREADY_EXISTS", 409, "USER_ALREADY_EXISTS");
+    check(Status.Code.FAILED_PRECONDITION, "USER_STATE_CONFLICT", 409, "USER_STATE_CONFLICT");
+    check(Status.Code.INVALID_ARGUMENT, null, 400, "INVALID_REQUEST");
   }
 
-  private void check(Kind kind, int httpStatus, String code) throws Exception {
-    willThrow(new UserAdministrationException(kind, "detail")).given(identity).getUser(any());
+  private void check(Status.Code grpc, String published, int httpStatus, String code)
+      throws Exception {
+    willThrow(new DownstreamCallException("incident-service", grpc, published, "detail", null))
+        .given(identity)
+        .getUser(any());
 
     mockMvc
         .perform(get("/api/v1/users/" + ID))
@@ -145,14 +200,16 @@ class UserControllerTest {
   }
 
   @Test
-  void identityDown_isBadGateway() throws Exception {
+  void identityDown_isServiceUnavailable() throws Exception {
     given(identity.listUsers(anyInt(), anyInt()))
-        .willThrow(new IdentityServiceException("down", null));
+        .willThrow(
+            new DownstreamCallException(
+                "incident-service", Status.Code.UNAVAILABLE, null, "down", null));
 
     mockMvc
         .perform(get("/api/v1/users"))
-        .andExpect(status().isBadGateway())
-        .andExpect(jsonPath("$.code").value("IDENTITY_SERVICE_UNAVAILABLE"));
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("UPSTREAM_UNAVAILABLE"));
   }
 
   @Test

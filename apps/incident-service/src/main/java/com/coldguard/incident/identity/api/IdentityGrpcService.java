@@ -28,7 +28,9 @@ import com.coldguard.incident.identity.application.UserNotFoundException;
 import com.coldguard.incident.identity.application.VerifyCredentialsService;
 import com.coldguard.incident.identity.domain.UserAccount;
 import com.google.protobuf.Timestamp;
+import io.grpc.Metadata;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -46,6 +48,9 @@ import org.springframework.grpc.server.service.GrpcService;
  */
 @GrpcService
 public class IdentityGrpcService extends IdentityServiceGrpc.IdentityServiceImplBase {
+
+  private static final Metadata.Key<String> ERROR_CODE_KEY =
+      Metadata.Key.of("x-error-code", Metadata.ASCII_STRING_MARSHALLER);
 
   static final String INVALID_CREDENTIALS = "Invalid credentials";
 
@@ -192,30 +197,37 @@ public class IdentityGrpcService extends IdentityServiceGrpc.IdentityServiceImpl
     try {
       reply = action.get();
     } catch (RuntimeException e) {
-      observer.onError(toStatus(e).asRuntimeException());
+      observer.onError(toStatus(e));
       return;
     }
     observer.onNext(reply);
     observer.onCompleted();
   }
 
-  private static Status toStatus(RuntimeException e) {
+  /** Business errors carry a stable code in the {@code x-error-code} trailer. */
+  private static StatusRuntimeException toStatus(RuntimeException e) {
     return switch (e) {
       case IdentityAccessDeniedException denied ->
-          Status.PERMISSION_DENIED.withDescription(denied.getMessage());
+          Status.PERMISSION_DENIED.withDescription(denied.getMessage()).asRuntimeException();
       case UserNotFoundException notFound ->
-          Status.NOT_FOUND.withDescription(notFound.getMessage());
+          coded(Status.NOT_FOUND, notFound.getMessage(), "USER_NOT_FOUND");
       case UserAlreadyExistsException taken ->
-          Status.ALREADY_EXISTS.withDescription(taken.getMessage());
+          coded(Status.ALREADY_EXISTS, taken.getMessage(), "USER_ALREADY_EXISTS");
       case LastAdministratorException last ->
-          Status.FAILED_PRECONDITION.withDescription(last.getMessage());
+          coded(Status.FAILED_PRECONDITION, last.getMessage(), "USER_STATE_CONFLICT");
       case IllegalArgumentException invalid ->
-          Status.INVALID_ARGUMENT.withDescription(invalid.getMessage());
+          Status.INVALID_ARGUMENT.withDescription(invalid.getMessage()).asRuntimeException();
       default -> {
         log.error("Unexpected error in identity administration", e);
-        yield Status.INTERNAL.withDescription("Unexpected error");
+        yield Status.INTERNAL.withDescription("Unexpected error").asRuntimeException();
       }
     };
+  }
+
+  private static StatusRuntimeException coded(Status status, String description, String code) {
+    Metadata trailers = new Metadata();
+    trailers.put(ERROR_CODE_KEY, code);
+    return status.withDescription(description).asRuntimeException(trailers);
   }
 
   private static User toGrpc(UserAccount user) {

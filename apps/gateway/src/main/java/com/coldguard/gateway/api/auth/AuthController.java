@@ -1,4 +1,4 @@
-package com.coldguard.gateway.api;
+package com.coldguard.gateway.api.auth;
 
 import com.coldguard.gateway.infrastructure.IdentityGrpcClient;
 import com.coldguard.gateway.infrastructure.InvalidCredentialsException;
@@ -28,14 +28,14 @@ public class AuthController {
   }
 
   @PostMapping("/login")
-  public ResponseEntity<LoginHttpResponse> login(@RequestBody LoginHttpRequest request) {
+  public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
     if (isInvalid(request.username()) || isInvalid(request.password())) {
       throw new InvalidCredentialsException();
     }
     var user = identity.verifyCredentials(request.username(), request.password());
     var token = tokens.issue(user.userId(), user.username(), user.roles());
     return ResponseEntity.ok(
-        new LoginHttpResponse(token.value(), "Bearer", token.expiresIn().toSeconds()));
+        new LoginResponse(token.value(), "Bearer", token.expiresIn().toSeconds()));
   }
 
   private static boolean isInvalid(String value) {

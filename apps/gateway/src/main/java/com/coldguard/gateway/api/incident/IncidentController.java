@@ -1,13 +1,16 @@
 package com.coldguard.gateway.api.incident;
 
+import com.coldguard.commons.correlation.CorrelationContext;
 import com.coldguard.gateway.api.common.PageResponse;
-import com.coldguard.gateway.infrastructure.IncidentOperationsGrpcClient;
+import com.coldguard.gateway.infrastructure.IncidentGrpcClient;
 import com.coldguard.incident.grpc.v1.AcknowledgeIncidentRequest;
 import com.coldguard.incident.grpc.v1.EscalateIncidentRequest;
 import com.coldguard.incident.grpc.v1.GetIncidentRequest;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,11 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/incidents")
-class IncidentOperationsController {
+class IncidentController {
 
-  private final IncidentOperationsGrpcClient incidents;
+  private final IncidentGrpcClient incidents;
 
-  IncidentOperationsController(IncidentOperationsGrpcClient incidents) {
+  IncidentController(IncidentGrpcClient incidents) {
     this.incidents = incidents;
   }
 
@@ -47,6 +50,16 @@ class IncidentOperationsController {
     return new PageResponse<>(
         reply.getIncidentsList().stream().map(IncidentRestMapper::toRest).toList(),
         IncidentRestMapper.toRest(reply.getPage()));
+  }
+
+  /** A technical entry point; open only while {@code technical-endpoints.enabled} is set. */
+  @PostMapping
+  ResponseEntity<IncidentResponse> create(@Valid @RequestBody CreateIncidentRequest request) {
+    var reply =
+        incidents.createIncident(
+            IncidentRestMapper.create(request, CorrelationContext.current().orElse(null)));
+    IncidentResponse created = IncidentRestMapper.toRest(reply.getIncident());
+    return ResponseEntity.created(URI.create("/api/v1/incidents/" + created.id())).body(created);
   }
 
   @GetMapping("/{incidentId}")
@@ -76,5 +89,12 @@ class IncidentOperationsController {
                 .setIncidentId(incidentId)
                 .setReason(request.reason())
                 .build()));
+  }
+
+  @PostMapping("/{incidentId}/close")
+  IncidentResponse close(
+      @PathVariable String incidentId, @Valid @RequestBody CloseIncidentRequest request) {
+    return IncidentRestMapper.toRest(
+        incidents.closeIncident(IncidentRestMapper.close(incidentId, request)).getIncident());
   }
 }

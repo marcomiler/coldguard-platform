@@ -49,6 +49,14 @@ coldguard:
         deadline: ${ASSET_SERVICE_DEADLINE:5s}
       telemetry-service:
         deadline: ${TELEMETRY_SERVICE_DEADLINE:5s}
+      # Also the deadline of Identity & Access, Audit Log and the operational metrics, which are
+      # modules of Incident Service and share its channel.
+      incident-service:
+        deadline: ${INCIDENT_SERVICE_DEADLINE:5s}
+    # A read-only query is retried this many times when the service is unavailable.
+    query-retries: ${COLDGUARD_QUERY_RETRIES:1}
+    # Larger request bodies are rejected with 413 before anything parses them.
+    max-request-body-size: ${COLDGUARD_MAX_REQUEST_BODY_SIZE:1MB}
     cors:
       # Explicit origins only ('*' is rejected at startup); empty means no cross-origin access.
       allowed-origins: ${COLDGUARD_CORS_ALLOWED_ORIGINS:}

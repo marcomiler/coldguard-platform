@@ -28,14 +28,21 @@ public class IncidentGrpcExceptionHandler implements GrpcExceptionHandler {
       case IncidentAlreadyOpenException ex -> {
         Metadata trailers = new Metadata();
         trailers.put(EXISTING_INCIDENT_ID_KEY, ex.getExistingIncidentId());
+        trailers.put(ERROR_CODE_KEY, "INCIDENT_ALREADY_EXISTS");
         yield Status.ALREADY_EXISTS
             .withDescription("An open incident already exists for this asset/sensor/anomaly type")
             .asException(trailers);
       }
-      case IllegalArgumentException ex ->
-          Status.INVALID_ARGUMENT.withDescription(ex.getMessage()).asException();
-      case IncidentNotFoundException ex ->
-          Status.NOT_FOUND.withDescription(ex.getMessage()).asException();
+      case IllegalArgumentException ex -> {
+        Metadata trailers = new Metadata();
+        trailers.put(ERROR_CODE_KEY, "INVALID_INCIDENT_REQUEST");
+        yield Status.INVALID_ARGUMENT.withDescription(ex.getMessage()).asException(trailers);
+      }
+      case IncidentNotFoundException ex -> {
+        Metadata trailers = new Metadata();
+        trailers.put(ERROR_CODE_KEY, "INCIDENT_NOT_FOUND");
+        yield Status.NOT_FOUND.withDescription(ex.getMessage()).asException(trailers);
+      }
       case IncidentAlreadyClosedException ex ->
           failedPrecondition(ex.getMessage(), "INCIDENT_ALREADY_CLOSED");
       case IncidentAlreadyAcknowledgedException ex ->

@@ -84,6 +84,7 @@ message CreateIncidentResponse {
   Urgency urgency = 4;
   Priority priority = 5;
   string created_at = 6; // ISO-8601
+  IncidentView incident = 7; // the full incident after the creation
 }
 
 message CloseIncidentRequest {
@@ -96,6 +97,7 @@ message CloseIncidentResponse {
   string incident_id = 1;
   IncidentStatus status = 2;
   string closed_at = 3; // ISO-8601
+  IncidentView incident = 4; // the full incident after the closing
 }
 
 message AcknowledgeIncidentRequest {

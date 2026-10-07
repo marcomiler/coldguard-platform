@@ -25,7 +25,7 @@ public class AuditLogGrpcClient {
   }
 
   public ListAuditRecordsResponse listAuditRecords(ListAuditRecordsRequest request) {
-    return invoker.call(
+    return invoker.query(
         SERVICE, stub, properties.deadline(SERVICE), s -> s.listAuditRecords(request));
   }
 }

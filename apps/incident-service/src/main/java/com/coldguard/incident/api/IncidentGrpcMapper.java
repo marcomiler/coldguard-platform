@@ -48,6 +48,7 @@ final class IncidentGrpcMapper {
         .setUrgency(urgency(incident.urgency()))
         .setPriority(priority(incident.priority()))
         .setCreatedAt(DateTimeFormatter.ISO_INSTANT.format(incident.createdAt()))
+        .setIncident(toView(incident))
         .build();
   }
 
@@ -56,6 +57,7 @@ final class IncidentGrpcMapper {
         .setIncidentId(incident.id())
         .setStatus(status(incident.status()))
         .setClosedAt(DateTimeFormatter.ISO_INSTANT.format(incident.closedAt()))
+        .setIncident(toView(incident))
         .build();
   }
 

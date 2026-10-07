@@ -3,6 +3,7 @@ package com.coldguard.gateway.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.coldguard.gateway.config.DownstreamProperties;
 import com.coldguard.identity.grpc.v1.AssignRoleRequest;
 import com.coldguard.identity.grpc.v1.IdentityServiceGrpc;
 import com.coldguard.identity.grpc.v1.Role;
@@ -14,6 +15,7 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -61,7 +63,10 @@ class IdentityGrpcClientAdminTest {
             .start();
     channel = InProcessChannelBuilder.forName(name).directExecutor().build();
     return new IdentityGrpcClient(
-        IdentityServiceGrpc.newBlockingStub(channel), Duration.ofSeconds(3));
+        IdentityServiceGrpc.newBlockingStub(channel),
+        new GrpcInvoker(),
+        new DownstreamProperties(
+            Map.of("incident-service", new DownstreamProperties.Service(Duration.ofSeconds(3)))));
   }
 
   @Test
@@ -78,45 +83,25 @@ class IdentityGrpcClientAdminTest {
   }
 
   @Test
-  void anUnknownRoleNameIsRejectedBeforeCallingIdentity() throws Exception {
-    var captured = new AtomicReference<AssignRoleRequest>();
-    var client = clientAnswering(captured, null);
-
-    for (String role : new String[] {"ROOT", "", null, "ROLE_UNSPECIFIED", "UNRECOGNIZED"}) {
-      assertThatThrownBy(() -> client.assignRole("u-1", role, "x"))
-          .isInstanceOfSatisfying(
-              UserAdministrationException.class,
-              e -> assertThat(e.kind()).isEqualTo(UserAdministrationException.Kind.INVALID));
-    }
-    assertThat(captured.get()).isNull();
+  void grpcFailuresBecomeOneDownstreamExceptionWithTheirCodeAndStatus() throws Exception {
+    expect(Status.PERMISSION_DENIED, Status.Code.PERMISSION_DENIED);
+    expect(Status.NOT_FOUND, Status.Code.NOT_FOUND);
+    expect(Status.ALREADY_EXISTS, Status.Code.ALREADY_EXISTS);
+    expect(Status.FAILED_PRECONDITION, Status.Code.FAILED_PRECONDITION);
+    expect(Status.INVALID_ARGUMENT, Status.Code.INVALID_ARGUMENT);
+    expect(Status.UNAVAILABLE, Status.Code.UNAVAILABLE);
   }
 
-  @Test
-  void grpcStatusesMapToAdministrationKinds() throws Exception {
-    expect(Status.PERMISSION_DENIED, UserAdministrationException.Kind.FORBIDDEN);
-    expect(Status.NOT_FOUND, UserAdministrationException.Kind.NOT_FOUND);
-    expect(Status.ALREADY_EXISTS, UserAdministrationException.Kind.ALREADY_EXISTS);
-    expect(Status.FAILED_PRECONDITION, UserAdministrationException.Kind.CONFLICT);
-    expect(Status.INVALID_ARGUMENT, UserAdministrationException.Kind.INVALID);
-  }
-
-  private void expect(Status status, UserAdministrationException.Kind kind) throws Exception {
+  private void expect(Status status, Status.Code code) throws Exception {
     var client = clientAnswering(new AtomicReference<>(), status.withDescription("why"));
     assertThatThrownBy(() -> client.assignRole("u-1", "OPERATOR", "x"))
         .isInstanceOfSatisfying(
-            UserAdministrationException.class,
+            DownstreamCallException.class,
             e -> {
-              assertThat(e.kind()).isEqualTo(kind);
+              assertThat(e.grpcCode()).isEqualTo(code);
               assertThat(e.getMessage()).isEqualTo("why");
+              assertThat(e.service()).isEqualTo("incident-service");
             });
     tearDown();
-  }
-
-  @Test
-  void anyOtherFailureIsTheGenericUnavailableError() throws Exception {
-    var client = clientAnswering(new AtomicReference<>(), Status.UNAVAILABLE);
-
-    assertThatThrownBy(() -> client.assignRole("u-1", "OPERATOR", "x"))
-        .isInstanceOf(IdentityServiceException.class);
   }
 }

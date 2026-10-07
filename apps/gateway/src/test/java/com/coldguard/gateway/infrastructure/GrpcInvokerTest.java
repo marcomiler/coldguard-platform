@@ -146,4 +146,74 @@ class GrpcInvokerTest {
                 .deadline("x"))
         .isEqualTo(Duration.ofSeconds(5));
   }
+
+  @Test
+  void aQueryIsRetriedOnceWhenTheServiceIsUnavailable_aCommandIsNot() throws Exception {
+    java.util.concurrent.atomic.AtomicInteger calls =
+        new java.util.concurrent.atomic.AtomicInteger();
+    AssetGrpcClient client =
+        clientAnswering(
+            observer -> {
+              if (calls.incrementAndGet() == 1) {
+                observer.onError(Status.UNAVAILABLE.asRuntimeException());
+              } else {
+                observer.onNext(Sensor.newBuilder().setId("s1").build());
+                observer.onCompleted();
+              }
+            },
+            Duration.ofSeconds(2));
+
+    assertThat(client.getSensor(GetSensorRequest.newBuilder().setSensorId("s1").build()).getId())
+        .isEqualTo("s1");
+    assertThat(calls.get()).isEqualTo(2);
+  }
+
+  @Test
+  void aQueryGivesUpAfterTheConfiguredRetries() throws Exception {
+    java.util.concurrent.atomic.AtomicInteger calls =
+        new java.util.concurrent.atomic.AtomicInteger();
+    String name = "invoker-retries-" + UUID.randomUUID();
+    server =
+        InProcessServerBuilder.forName(name)
+            .addService(
+                new AssetServiceGrpc.AssetServiceImplBase() {
+                  @Override
+                  public void getSensor(GetSensorRequest request, StreamObserver<Sensor> observer) {
+                    calls.incrementAndGet();
+                    observer.onError(Status.UNAVAILABLE.asRuntimeException());
+                  }
+                })
+            .build()
+            .start();
+    channel = InProcessChannelBuilder.forName(name).build();
+    AssetGrpcClient client =
+        new AssetGrpcClient(
+            AssetServiceGrpc.newBlockingStub(channel),
+            new GrpcInvoker(2),
+            new DownstreamProperties(
+                Map.of("asset-service", new DownstreamProperties.Service(Duration.ofSeconds(2)))));
+
+    assertThatThrownBy(() -> client.getSensor(GetSensorRequest.newBuilder().build()))
+        .isInstanceOfSatisfying(
+            DownstreamCallException.class,
+            e -> assertThat(e.grpcCode()).isEqualTo(Status.Code.UNAVAILABLE));
+    assertThat(calls.get()).isEqualTo(3);
+  }
+
+  @Test
+  void otherFailuresAreNeverRetried() throws Exception {
+    java.util.concurrent.atomic.AtomicInteger calls =
+        new java.util.concurrent.atomic.AtomicInteger();
+    AssetGrpcClient client =
+        clientAnswering(
+            observer -> {
+              calls.incrementAndGet();
+              observer.onError(Status.NOT_FOUND.asRuntimeException());
+            },
+            Duration.ofSeconds(2));
+
+    assertThatThrownBy(() -> client.getSensor(GetSensorRequest.newBuilder().build()))
+        .isInstanceOf(DownstreamCallException.class);
+    assertThat(calls.get()).isEqualTo(1);
+  }
 }

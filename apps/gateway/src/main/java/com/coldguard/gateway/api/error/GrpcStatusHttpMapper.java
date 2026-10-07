@@ -1,6 +1,7 @@
 package com.coldguard.gateway.api.error;
 
 import com.coldguard.gateway.infrastructure.DownstreamCallException;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -11,7 +12,17 @@ import org.springframework.http.HttpStatus;
 public final class GrpcStatusHttpMapper {
 
   /** What the client is told. */
-  public record Mapped(HttpStatus status, String code, String detail, boolean logAsError) {}
+  public record Mapped(
+      HttpStatus status,
+      String code,
+      String detail,
+      boolean logAsError,
+      Map<String, String> extensions) {
+
+    public Mapped(HttpStatus status, String code, String detail, boolean logAsError) {
+      this(status, code, detail, logAsError, Map.of());
+    }
+  }
 
   private static final String INTERNAL_DETAIL = "The service could not complete the request";
 
@@ -54,6 +65,7 @@ public final class GrpcStatusHttpMapper {
 
   private static Mapped business(
       HttpStatus status, String published, String fallback, DownstreamCallException e) {
-    return new Mapped(status, published != null ? published : fallback, e.getMessage(), false);
+    return new Mapped(
+        status, published != null ? published : fallback, e.getMessage(), false, e.details());
   }
 }

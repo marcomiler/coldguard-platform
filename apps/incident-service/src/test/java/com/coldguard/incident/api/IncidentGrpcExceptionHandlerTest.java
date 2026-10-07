@@ -28,6 +28,8 @@ class IncidentGrpcExceptionHandlerTest {
     assertThat(trailers).isNotNull();
     assertThat(trailers.get(IncidentGrpcExceptionHandler.EXISTING_INCIDENT_ID_KEY))
         .isEqualTo("existing-id");
+    assertThat(trailers.get(IncidentGrpcExceptionHandler.ERROR_CODE_KEY))
+        .isEqualTo("INCIDENT_ALREADY_EXISTS");
   }
 
   @Test
@@ -69,5 +71,21 @@ class IncidentGrpcExceptionHandlerTest {
 
   private Status.Code code(Throwable t) {
     return Status.fromThrowable(handler.handleException(t)).getCode();
+  }
+
+  @Test
+  void handleException_publishesStableBusinessCodesForNotFoundAndInvalidRequests() {
+    assertThat(
+            handler
+                .handleException(new IncidentNotFoundException("i"))
+                .getTrailers()
+                .get(IncidentGrpcExceptionHandler.ERROR_CODE_KEY))
+        .isEqualTo("INCIDENT_NOT_FOUND");
+    assertThat(
+            handler
+                .handleException(new IllegalArgumentException("bad"))
+                .getTrailers()
+                .get(IncidentGrpcExceptionHandler.ERROR_CODE_KEY))
+        .isEqualTo("INVALID_INCIDENT_REQUEST");
   }
 }

@@ -25,7 +25,7 @@ public class OperationalMetricsGrpcClient {
   }
 
   public GetIncidentMetricsResponse getIncidentMetrics(GetIncidentMetricsRequest request) {
-    return invoker.call(
+    return invoker.query(
         SERVICE, stub, properties.deadline(SERVICE), s -> s.getIncidentMetrics(request));
   }
 }
