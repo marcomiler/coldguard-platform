@@ -34,6 +34,10 @@ public class TelemetryGrpcClient {
     this.properties = properties;
   }
 
+  private <R> R query(Function<TelemetryServiceGrpc.TelemetryServiceBlockingStub, R> call) {
+    return invoker.query(SERVICE, stub, properties.deadline(SERVICE), call);
+  }
+
   private <R> R call(Function<TelemetryServiceGrpc.TelemetryServiceBlockingStub, R> call) {
     return invoker.call(SERVICE, stub, properties.deadline(SERVICE), call);
   }
@@ -43,11 +47,11 @@ public class TelemetryGrpcClient {
   }
 
   public ListReadingsResponse listReadings(ListReadingsRequest request) {
-    return call(s -> s.listReadings(request));
+    return query(s -> s.listReadings(request));
   }
 
   public ListConnectivityStatusResponse listConnectivityStatus(
       ListConnectivityStatusRequest request) {
-    return call(s -> s.listConnectivityStatus(request));
+    return query(s -> s.listConnectivityStatus(request));
   }
 }

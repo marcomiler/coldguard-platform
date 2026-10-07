@@ -1,54 +1,71 @@
 package com.coldguard.gateway.infrastructure;
 
+import com.coldguard.gateway.config.DownstreamProperties;
+import com.coldguard.incident.grpc.v1.AcknowledgeIncidentRequest;
 import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
 import com.coldguard.incident.grpc.v1.CloseIncidentResponse;
 import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.CreateIncidentResponse;
+import com.coldguard.incident.grpc.v1.EscalateIncidentRequest;
+import com.coldguard.incident.grpc.v1.GetIncidentRequest;
 import com.coldguard.incident.grpc.v1.IncidentServiceGrpc;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
+import com.coldguard.incident.grpc.v1.IncidentView;
+import com.coldguard.incident.grpc.v1.ListIncidentsRequest;
+import com.coldguard.incident.grpc.v1.ListIncidentsResponse;
+import java.util.function.Function;
 import org.springframework.stereotype.Component;
 
 /**
- * Thin adapter over the Incident Service gRPC stub: forwards the request as-is (including
- * correlation_id, already a plain field on the request) and translates a failed call into a typed
- * exception.
+ * Incident Service: queries and lifecycle commands. Every call goes through {@link GrpcInvoker};
+ * the caller's identity travels as metadata, added by the global interceptor.
  */
 @Component
 public class IncidentGrpcClient {
 
-  private final IncidentServiceGrpc.IncidentServiceBlockingStub stub;
+  static final String SERVICE = "incident-service";
 
-  public IncidentGrpcClient(IncidentServiceGrpc.IncidentServiceBlockingStub stub) {
+  private final IncidentServiceGrpc.IncidentServiceBlockingStub stub;
+  private final GrpcInvoker invoker;
+  private final DownstreamProperties properties;
+
+  public IncidentGrpcClient(
+      IncidentServiceGrpc.IncidentServiceBlockingStub stub,
+      GrpcInvoker invoker,
+      DownstreamProperties properties) {
     this.stub = stub;
+    this.invoker = invoker;
+    this.properties = properties;
+  }
+
+  private <R> R call(Function<IncidentServiceGrpc.IncidentServiceBlockingStub, R> call) {
+    return invoker.call(SERVICE, stub, properties.deadline(SERVICE), call);
+  }
+
+  private <R> R query(Function<IncidentServiceGrpc.IncidentServiceBlockingStub, R> call) {
+    return invoker.query(SERVICE, stub, properties.deadline(SERVICE), call);
+  }
+
+  public IncidentView getIncident(GetIncidentRequest request) {
+    return query(s -> s.getIncident(request));
+  }
+
+  public ListIncidentsResponse listIncidents(ListIncidentsRequest request) {
+    return query(s -> s.listIncidents(request));
   }
 
   public CreateIncidentResponse createIncident(CreateIncidentRequest request) {
-    try {
-      return stub.createIncident(request);
-    } catch (StatusRuntimeException ex) {
-      throw translate(ex);
-    }
+    return call(s -> s.createIncident(request));
   }
 
   public CloseIncidentResponse closeIncident(CloseIncidentRequest request) {
-    try {
-      return stub.closeIncident(request);
-    } catch (StatusRuntimeException ex) {
-      throw translate(ex);
-    }
+    return call(s -> s.closeIncident(request));
   }
 
-  private static IncidentServiceException translate(StatusRuntimeException ex) {
-    Status status = ex.getStatus();
-    String message = status.getDescription();
-    return switch (status.getCode()) {
-      case ALREADY_EXISTS -> new IncidentAlreadyExistsException(message, ex);
-      case INVALID_ARGUMENT -> new InvalidIncidentRequestException(message, ex);
-      case NOT_FOUND -> new IncidentNotFoundException(message, ex);
-      case FAILED_PRECONDITION -> new IncidentAlreadyClosedException(message, ex);
-      case PERMISSION_DENIED -> new IncidentCloseForbiddenException(message, ex);
-      default -> new IncidentServiceException(message, ex);
-    };
+  public IncidentView acknowledgeIncident(AcknowledgeIncidentRequest request) {
+    return call(s -> s.acknowledgeIncident(request));
+  }
+
+  public IncidentView escalateIncident(EscalateIncidentRequest request) {
+    return call(s -> s.escalateIncident(request));
   }
 }

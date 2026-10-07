@@ -28,7 +28,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
       "com.coldguard.gateway.api.telemetry",
       "com.coldguard.gateway.api.incident",
       "com.coldguard.gateway.api.audit",
-      "com.coldguard.gateway.api.metrics"
+      "com.coldguard.gateway.api.metrics",
+      "com.coldguard.gateway.api.user"
     })
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiExceptionHandler {
@@ -46,7 +47,10 @@ public class ApiExceptionHandler {
           CorrelationContext.current().orElse("-"),
           e);
     }
-    return problem(mapped.status(), mapped.code(), mapped.detail(), null);
+    ResponseEntity<ProblemDetail> response =
+        problem(mapped.status(), mapped.code(), mapped.detail(), null);
+    mapped.extensions().forEach((name, value) -> response.getBody().setProperty(name, value));
+    return response;
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

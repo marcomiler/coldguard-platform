@@ -18,7 +18,7 @@ import com.coldguard.gateway.api.audit.AuditController;
 import com.coldguard.gateway.api.metrics.MetricsController;
 import com.coldguard.gateway.infrastructure.AuditLogGrpcClient;
 import com.coldguard.gateway.infrastructure.DownstreamCallException;
-import com.coldguard.gateway.infrastructure.IncidentOperationsGrpcClient;
+import com.coldguard.gateway.infrastructure.IncidentGrpcClient;
 import com.coldguard.gateway.infrastructure.OperationalMetricsGrpcClient;
 import com.coldguard.incident.grpc.v1.AcknowledgeIncidentRequest;
 import com.coldguard.incident.grpc.v1.EscalateIncidentRequest;
@@ -45,19 +45,15 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /** Incident, metrics and audit routes: REST vocabulary, shape validation and the gRPC request. */
 @WebMvcTest(
-    controllers = {
-      IncidentOperationsController.class,
-      MetricsController.class,
-      AuditController.class
-    })
+    controllers = {IncidentController.class, MetricsController.class, AuditController.class})
 @AutoConfigureMockMvc(addFilters = false)
-class IncidentOperationsRestApiTest {
+class IncidentRestApiTest {
 
   private static final String ID = "3f1c2f7e-0000-4000-8000-000000000001";
   private static final Timestamp T0 = Timestamp.newBuilder().setSeconds(1_790_000_000L).build();
 
   @Autowired private MockMvc mockMvc;
-  @MockitoBean private IncidentOperationsGrpcClient incidents;
+  @MockitoBean private IncidentGrpcClient incidents;
   @MockitoBean private OperationalMetricsGrpcClient metrics;
   @MockitoBean private AuditLogGrpcClient audit;
 
@@ -297,5 +293,106 @@ class IncidentOperationsRestApiTest {
   @Test
   void auditRecords_requireTheRange() throws Exception {
     mockMvc.perform(get("/api/v1/audit-records")).andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void create_translatesToTheGrpcVocabularyAndAnswers201WithTheFullIncident() throws Exception {
+    given(incidents.createIncident(any()))
+        .willReturn(
+            com.coldguard.incident.grpc.v1.CreateIncidentResponse.newBuilder()
+                .setIncident(aView())
+                .build());
+
+    mockMvc
+        .perform(
+            post("/api/v1/incidents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"assetId":"a1","assetCriticality":"CRITICAL","sensorId":"s1",
+                     "anomalyType":"TEMPERATURE_ABOVE_MAX","magnitude":"HIGH","persistent":true}
+                    """))
+        .andExpect(status().isCreated())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string("Location", "/api/v1/incidents/" + ID))
+        .andExpect(jsonPath("$.id").value(ID))
+        .andExpect(jsonPath("$.priority").value("P1"));
+
+    ArgumentCaptor<com.coldguard.incident.grpc.v1.CreateIncidentRequest> captor =
+        ArgumentCaptor.forClass(com.coldguard.incident.grpc.v1.CreateIncidentRequest.class);
+    verify(incidents).createIncident(captor.capture());
+    assertThat(captor.getValue().getAssetCriticality())
+        .isEqualTo(com.coldguard.incident.grpc.v1.Criticality.CRITICALITY_CRITICAL);
+    assertThat(captor.getValue().getMagnitude())
+        .isEqualTo(com.coldguard.incident.grpc.v1.Magnitude.MAGNITUDE_HIGH);
+    assertThat(captor.getValue().getPersistent()).isTrue();
+  }
+
+  @Test
+  void create_validatesTheShapeWithoutCallingTheService() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/incidents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"assetId\":\" \",\"magnitude\":\"HIGH\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.errors[?(@.field=='assetId')]").exists())
+        .andExpect(jsonPath("$.errors[?(@.field=='assetCriticality')]").exists());
+    org.mockito.Mockito.verifyNoInteractions(incidents);
+  }
+
+  @Test
+  void create_withAProtocolPrefixedEnum_isRejected() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/incidents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"assetId":"a1","assetCriticality":"CRITICALITY_HIGH","sensorId":"s1",
+                     "anomalyType":"t","magnitude":"MAGNITUDE_HIGH"}
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST_BODY"));
+  }
+
+  @Test
+  void close_answersTheFullIncident() throws Exception {
+    given(incidents.closeIncident(any()))
+        .willReturn(
+            com.coldguard.incident.grpc.v1.CloseIncidentResponse.newBuilder()
+                .setIncident(
+                    aView().toBuilder()
+                        .setStatus(com.coldguard.incident.grpc.v1.IncidentStatus.CLOSED)
+                        .setClosedAt(T0)
+                        .setClosedBy("tech-1")
+                        .setCause("overheating")
+                        .setResolutionComment("replaced"))
+                .build());
+
+    mockMvc
+        .perform(
+            post("/api/v1/incidents/" + ID + "/close")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cause\":\"overheating\",\"resolutionComment\":\"replaced\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CLOSED"))
+        .andExpect(jsonPath("$.cause").value("overheating"))
+        .andExpect(jsonPath("$.closedBy").value("tech-1"))
+        .andExpect(jsonPath("$.closedAt").exists());
+  }
+
+  @Test
+  void close_requiresCauseAndComment() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/incidents/" + ID + "/close")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cause\":\"\",\"resolutionComment\":\"x\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[?(@.field=='cause')]").exists());
+    org.mockito.Mockito.verifyNoInteractions(incidents);
   }
 }

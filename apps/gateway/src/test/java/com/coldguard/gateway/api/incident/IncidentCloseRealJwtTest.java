@@ -1,4 +1,4 @@
-package com.coldguard.gateway.api;
+package com.coldguard.gateway.api.incident;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -12,6 +12,7 @@ import com.coldguard.gateway.infrastructure.IncidentGrpcClient;
 import com.coldguard.gateway.testsupport.TestJwtKeys;
 import com.coldguard.incident.grpc.v1.CloseIncidentResponse;
 import com.coldguard.incident.grpc.v1.IncidentStatus;
+import com.coldguard.incident.grpc.v1.IncidentView;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -27,17 +28,16 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * Exercises the real {@code JwtDecoder} end to end (real RS256 signature, issuer and expiry
  * validation against a throwaway key pair, {@link TestJwtKeys}) via a real {@code Authorization:
- * Bearer <token>} header. Complements, and does not replace, {@link IncidentControllerCloseTest} —
- * that class uses {@code SecurityMockMvcRequestPostProcessors.jwt()}, which injects an
- * already-built {@code Authentication} directly into the security context and never invokes a
- * decoder.
+ * Bearer <token>} header. Complements, and does not replace, {@code IncidentRestApiTest} — that
+ * class uses {@code SecurityMockMvcRequestPostProcessors.jwt()}, which injects an already-built
+ * {@code Authentication} directly into the security context and never invokes a decoder.
  *
  * <p>The keys are created in a static field because {@code @DynamicPropertySource} static methods
  * run before user-declared {@code @BeforeAll} methods.
  */
 @WebMvcTest(controllers = IncidentController.class)
 @Import({SecurityConfig.class, JwtConfig.class})
-class IncidentControllerCloseRealJwtTest {
+class IncidentCloseRealJwtTest {
 
   private static final String CLOSE_REQUEST_BODY =
       """
@@ -66,6 +66,12 @@ class IncidentControllerCloseRealJwtTest {
                 .setIncidentId("incident-1")
                 .setStatus(IncidentStatus.CLOSED)
                 .setClosedAt("2026-01-01T00:00:00Z")
+                .setIncident(
+                    IncidentView.newBuilder()
+                        .setIncidentId("incident-1")
+                        .setStatus(IncidentStatus.CLOSED)
+                        .setCreatedAt(com.google.protobuf.Timestamp.newBuilder().setSeconds(1))
+                        .build())
                 .build());
     String token =
         KEYS.token(
@@ -81,7 +87,7 @@ class IncidentControllerCloseRealJwtTest {
                 .contentType("application/json")
                 .content(CLOSE_REQUEST_BODY))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.incidentId").value("incident-1"))
+        .andExpect(jsonPath("$.id").value("incident-1"))
         .andExpect(jsonPath("$.status").value("CLOSED"));
   }
 

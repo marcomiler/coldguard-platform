@@ -172,8 +172,16 @@ versión de `springdoc-openapi` compatible con Spring Boot 4.1.1): cubre todo el
 operación marcada `implemented` o `planned`, y `OpenApiContractTest` impide que se separe del
 código (las rutas coinciden en ambos sentidos, los roles coinciden con la cadena de seguridad real,
 las referencias resuelven y ningún esquema compartido usa enums con prefijo de protocolo). Los
-ejemplos de error y el esquema Bearer están declarados. Pendiente: migrar las rutas de Incident,
-Identity y Auth a estas convenciones, y el límite de tamaño del cuerpo.
+ejemplos de error y el esquema Bearer están declarados. Incident, Identity y Auth ya siguen las convenciones: DTO como `record` con Bean Validation y enums
+REST sin prefijo (el cambio de `POST /incidents` y `POST /incidents/{id}/close` es incompatible con
+la forma anterior y se comunica en `contracts/rest/openapi.yaml` 0.3.0), una sola
+`DownstreamCallException` (se eliminaron las excepciones por servicio), códigos de negocio por el
+trailer `x-error-code` (con `existingIncidentId` para `INCIDENT_ALREADY_EXISTS`) y el advice único
+(Auth conserva el suyo solo para que todo fallo de login sea el mismo 401). El cuerpo de una
+petición se limita con `RequestBodyLimitFilter` (`coldguard.gateway.max-request-body-size`, 1 MB →
+413 `REQUEST_TOO_LARGE`); las consultas se reintentan `coldguard.gateway.query-retries` veces (1)
+ante `UNAVAILABLE`, los comandos nunca. Pendiente: trazas con `traceparent` (SPEC-011) y el circuit
+breaker (evolución).
 
 ## Tareas
 

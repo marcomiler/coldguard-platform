@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ColdGuard API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     REST API of the ColdGuard Gateway, the only entry point to the platform. It is the contract the
     frontend integrates against.
@@ -29,10 +29,9 @@ info:
     - A fresh creation answers `201` (with `Location` when the resource can be fetched by id); an
       action on an existing resource answers `200` with the updated resource.
 
-    **Legacy vocabulary.** `POST /incidents` and `POST /incidents/{incidentId}/close` still answer
-    with protocol-prefixed enums (`IMPACT_HIGH`, `CRITICALITY_HIGH`). They will move to the shared
-    vocabulary and to the incident shape below when the incident service is completed (SPEC-007);
-    do not integrate them yet. See `LegacyCreateIncident*` and `LegacyCloseIncident*`.
+    - A request body larger than 1 MB is rejected with `413 REQUEST_TOO_LARGE` before it is parsed.
+    - Read-only requests are retried once by the Gateway when a service is briefly unavailable;
+      commands are never retried.
 servers:
   - url: http://localhost:8080/api/v1
     description: Local Docker Compose (the Gateway is the only published port)
@@ -803,24 +802,26 @@ paths:
       tags: [Incidents]
       summary: Create an incident (technical entry point)
       description: |
-        **Legacy shape, do not integrate.** A technical entry point that exists only when the Gateway
-        runs with `COLDGUARD_TECHNICAL_ENDPOINTS_ENABLED=true` (on in local Compose). Real incidents are
-        created from telemetry. It will be replaced when SPEC-007 lands.
+        A technical entry point that exists only when the Gateway runs with
+        `COLDGUARD_TECHNICAL_ENDPOINTS_ENABLED=true` (on in local Compose). Real incidents are created
+        from telemetry. An equivalent incident that is still open answers `409 INCIDENT_ALREADY_EXISTS`
+        with the `existingIncidentId`.
       operationId: createIncident
       x-status: implemented
-      x-legacy: true
       x-roles: [PLATFORM_ADMIN]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/LegacyCreateIncidentRequest' }
+            schema: { $ref: '#/components/schemas/CreateIncidentRequest' }
       responses:
         '201':
           description: Created
+          headers:
+            Location: { schema: { type: string } }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/LegacyCreateIncidentResponse' }
+              schema: { $ref: '#/components/schemas/Incident' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -899,12 +900,10 @@ paths:
       tags: [Incidents]
       summary: Close an incident
       description: |
-        Only the maintenance technician closes an incident. **Legacy response shape, do not integrate
-        yet:** today it answers `LegacyCloseIncidentResponse`; with SPEC-007 it answers the full
-        `Incident` (with `cause`, `resolutionComment`, `closedAt`, `closedBy` persisted).
+        Only the maintenance technician closes an incident. The cause and the resolution comment
+        are required and are kept with the incident (`cause`, `resolutionComment`, `closedAt`, `closedBy`).
       operationId: closeIncident
       x-status: implemented
-      x-legacy: true
       x-roles: [MAINTENANCE_TECHNICIAN]
       parameters:
         - $ref: '#/components/parameters/IncidentId'
@@ -915,10 +914,10 @@ paths:
             schema: { $ref: '#/components/schemas/CloseIncidentRequest' }
       responses:
         '200':
-          description: Closed
+          description: The closed incident
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/LegacyCloseIncidentResponse' }
+              schema: { $ref: '#/components/schemas/Incident' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1109,6 +1108,7 @@ components:
           description: Stable machine-readable code; branch on this, not on `detail`.
           example: SENSOR_TRANSITION_NOT_ALLOWED
         correlationId: { type: string }
+        existingIncidentId: { type: string, description: "Only on `INCIDENT_ALREADY_EXISTS`: the incident that is already open." }
         errors:
           type: array
           description: Present on `INVALID_REQUEST`; one entry per invalid field.
@@ -1572,35 +1572,17 @@ components:
       required: [cause, resolutionComment]
       properties:
         cause: { type: string, maxLength: 500 }
-        resolutionComment: { type: string, maxLength: 500 }
-    LegacyCreateIncidentRequest:
+        resolutionComment: { type: string, maxLength: 2000 }
+    CreateIncidentRequest:
       type: object
-      description: Protocol-prefixed vocabulary; do not integrate. Replaced by SPEC-007.
+      required: [assetId, assetCriticality, sensorId, anomalyType, magnitude]
       properties:
-        assetId: { type: string }
-        assetCriticality: { type: string, enum: [CRITICALITY_LOW, CRITICALITY_MEDIUM, CRITICALITY_HIGH, CRITICALITY_CRITICAL] }
-        sensorId: { type: string }
-        anomalyType: { type: string }
-        magnitude: { type: string, enum: [MAGNITUDE_LOW, MAGNITUDE_MEDIUM, MAGNITUDE_HIGH, MAGNITUDE_CRITICAL] }
-        persistent: { type: boolean }
-        correlationId: { type: string }
-    LegacyCreateIncidentResponse:
-      type: object
-      description: Protocol-prefixed vocabulary; do not integrate. Replaced by SPEC-007.
-      properties:
-        incidentId: { type: string }
-        status: { type: string }
-        impact: { type: string, example: IMPACT_HIGH }
-        urgency: { type: string, example: URGENCY_IMMEDIATE }
-        priority: { type: string, example: P1 }
-        createdAt: { type: string }
-    LegacyCloseIncidentResponse:
-      type: object
-      description: Replaced by the full `Incident` in SPEC-007; do not integrate.
-      properties:
-        incidentId: { type: string }
-        status: { type: string, example: CLOSED }
-        closedAt: { type: string }
+        assetId: { type: string, maxLength: 100 }
+        assetCriticality: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] }
+        sensorId: { type: string, maxLength: 100 }
+        anomalyType: { type: string, maxLength: 100, example: TEMPERATURE_ABOVE_MAX }
+        magnitude: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] }
+        persistent: { type: boolean, default: false }
     IncidentMetrics:
       type: object
       required: [countByStatus, countByPriority, byPriority]

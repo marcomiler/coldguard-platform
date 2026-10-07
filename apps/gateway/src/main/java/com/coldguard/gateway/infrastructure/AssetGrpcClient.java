@@ -58,6 +58,10 @@ public class AssetGrpcClient {
     this.properties = properties;
   }
 
+  private <R> R query(Function<AssetServiceGrpc.AssetServiceBlockingStub, R> call) {
+    return invoker.query(SERVICE, stub, properties.deadline(SERVICE), call);
+  }
+
   private <R> R call(Function<AssetServiceGrpc.AssetServiceBlockingStub, R> call) {
     return invoker.call(SERVICE, stub, properties.deadline(SERVICE), call);
   }
@@ -67,7 +71,7 @@ public class AssetGrpcClient {
   }
 
   public ListOrganizationsResponse listOrganizations(ListOrganizationsRequest request) {
-    return call(s -> s.listOrganizations(request));
+    return query(s -> s.listOrganizations(request));
   }
 
   public Site createSite(CreateSiteRequest request) {
@@ -75,7 +79,7 @@ public class AssetGrpcClient {
   }
 
   public ListSitesResponse listSites(ListSitesRequest request) {
-    return call(s -> s.listSites(request));
+    return query(s -> s.listSites(request));
   }
 
   public Asset registerAsset(RegisterAssetRequest request) {
@@ -87,11 +91,11 @@ public class AssetGrpcClient {
   }
 
   public Asset getAsset(GetAssetRequest request) {
-    return call(s -> s.getAsset(request));
+    return query(s -> s.getAsset(request));
   }
 
   public ListAssetsResponse listAssets(ListAssetsRequest request) {
-    return call(s -> s.listAssets(request));
+    return query(s -> s.listAssets(request));
   }
 
   public Sensor registerSensor(RegisterSensorRequest request) {
@@ -103,11 +107,11 @@ public class AssetGrpcClient {
   }
 
   public Sensor getSensor(GetSensorRequest request) {
-    return call(s -> s.getSensor(request));
+    return query(s -> s.getSensor(request));
   }
 
   public ListSensorsResponse listSensors(ListSensorsRequest request) {
-    return call(s -> s.listSensors(request));
+    return query(s -> s.listSensors(request));
   }
 
   public OperationalProfile upsertOperationalProfile(UpsertOperationalProfileRequest request) {
@@ -115,7 +119,7 @@ public class AssetGrpcClient {
   }
 
   public OperationalProfile getOperationalProfile(GetOperationalProfileRequest request) {
-    return call(s -> s.getOperationalProfile(request));
+    return query(s -> s.getOperationalProfile(request));
   }
 
   public Sensor changeSensorStatus(ChangeSensorStatusRequest request) {
@@ -135,6 +139,6 @@ public class AssetGrpcClient {
   }
 
   public GetSensorHistoryResponse getSensorHistory(GetSensorHistoryRequest request) {
-    return call(s -> s.getSensorHistory(request));
+    return query(s -> s.getSensorHistory(request));
   }
 }

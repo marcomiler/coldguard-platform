@@ -1,6 +1,7 @@
 package com.coldguard.gateway.infrastructure;
 
 import com.coldguard.common.grpc.v1.PageRequest;
+import com.coldguard.gateway.config.DownstreamProperties;
 import com.coldguard.identity.grpc.v1.AssignRoleRequest;
 import com.coldguard.identity.grpc.v1.AuthenticatedUser;
 import com.coldguard.identity.grpc.v1.CreateUserRequest;
@@ -13,10 +14,8 @@ import com.coldguard.identity.grpc.v1.SetUserEnabledRequest;
 import com.coldguard.identity.grpc.v1.User;
 import com.coldguard.identity.grpc.v1.VerifyCredentialsRequest;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import java.time.Duration;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
+import java.util.function.Function;
 import org.springframework.stereotype.Component;
 
 /**
@@ -42,48 +41,66 @@ public class IdentityGrpcClient {
   public record UserPage(
       List<UserView> users, int page, int size, long totalElements, int totalPages) {}
 
+  /** Identity & Access is a module of Incident Service and shares its channel and deadline. */
+  static final String SERVICE = "incident-service";
+
   private final IdentityServiceGrpc.IdentityServiceBlockingStub stub;
-  private final Duration deadline;
+  private final GrpcInvoker invoker;
+  private final DownstreamProperties properties;
 
   public IdentityGrpcClient(
       IdentityServiceGrpc.IdentityServiceBlockingStub stub,
-      @Value("${coldguard.security.login.deadline:3s}") Duration deadline) {
+      GrpcInvoker invoker,
+      DownstreamProperties properties) {
     this.stub = stub;
-    this.deadline = deadline;
+    this.invoker = invoker;
+    this.properties = properties;
   }
 
+  private <R> R command(Function<IdentityServiceGrpc.IdentityServiceBlockingStub, R> call) {
+    return invoker.call(SERVICE, stub, properties.deadline(SERVICE), call);
+  }
+
+  private <R> R query(Function<IdentityServiceGrpc.IdentityServiceBlockingStub, R> call) {
+    return invoker.query(SERVICE, stub, properties.deadline(SERVICE), call);
+  }
+
+  /**
+   * @throws InvalidCredentialsException whatever the reason Identity refused them
+   */
   public VerifiedUser verifyCredentials(String username, String password) {
+    AuthenticatedUser user;
     try {
-      AuthenticatedUser user =
-          stub.withDeadlineAfter(deadline.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
-              .verifyCredentials(
-                  VerifyCredentialsRequest.newBuilder()
-                      .setUsername(username)
-                      .setPassword(password)
-                      .build());
-      List<String> roles =
-          user.getRolesList().stream()
-              .filter(role -> role != Role.ROLE_UNSPECIFIED && role != Role.UNRECOGNIZED)
-              .map(Role::name)
-              .toList();
-      return new VerifiedUser(user.getUserId(), user.getUsername(), roles);
-    } catch (StatusRuntimeException ex) {
-      if (ex.getStatus().getCode() == Status.Code.UNAUTHENTICATED) {
+      user =
+          command(
+              s ->
+                  s.verifyCredentials(
+                      VerifyCredentialsRequest.newBuilder()
+                          .setUsername(username)
+                          .setPassword(password)
+                          .build()));
+    } catch (DownstreamCallException ex) {
+      if (ex.grpcCode() == Status.Code.UNAUTHENTICATED) {
         throw new InvalidCredentialsException();
       }
-      throw new IdentityServiceException("Identity service unavailable", ex);
+      throw ex;
     }
+    List<String> roles =
+        user.getRolesList().stream()
+            .filter(role -> role != Role.ROLE_UNSPECIFIED && role != Role.UNRECOGNIZED)
+            .map(Role::name)
+            .toList();
+    return new VerifiedUser(user.getUserId(), user.getUsername(), roles);
   }
 
   public UserPage listUsers(int page, int size) {
     var reply =
-        call(
-            () ->
-                stub()
-                    .listUsers(
-                        ListUsersRequest.newBuilder()
-                            .setPage(PageRequest.newBuilder().setPage(page).setSize(size))
-                            .build()));
+        query(
+            s ->
+                s.listUsers(
+                    ListUsersRequest.newBuilder()
+                        .setPage(PageRequest.newBuilder().setPage(page).setSize(size))
+                        .build()));
     return new UserPage(
         reply.getUsersList().stream().map(IdentityGrpcClient::toView).toList(),
         reply.getPage().getPage(),
@@ -93,8 +110,7 @@ public class IdentityGrpcClient {
   }
 
   public UserView getUser(String userId) {
-    return toView(
-        call(() -> stub().getUser(GetUserRequest.newBuilder().setUserId(userId).build())));
+    return toView(query(s -> s.getUser(GetUserRequest.newBuilder().setUserId(userId).build())));
   }
 
   /** {@code initialPassword} is sensitive: passed through, never logged. */
@@ -111,7 +127,7 @@ public class IdentityGrpcClient {
             .setDisplayName(nullToEmpty(displayName))
             .setInitialPassword(nullToEmpty(initialPassword));
     (roles == null ? List.<String>of() : roles).forEach(role -> request.addRoles(toRole(role)));
-    return toView(call(() -> stub().createUser(request.build())));
+    return toView(command(s -> s.createUser(request.build())));
   }
 
   public UserView assignRole(String userId, String role, String reason) {
@@ -121,7 +137,7 @@ public class IdentityGrpcClient {
             .setRole(toRole(role))
             .setReason(nullToEmpty(reason))
             .build();
-    return toView(call(() -> stub().assignRole(request)));
+    return toView(command(s -> s.assignRole(request)));
   }
 
   public UserView revokeRole(String userId, String role, String reason) {
@@ -131,7 +147,7 @@ public class IdentityGrpcClient {
             .setRole(toRole(role))
             .setReason(nullToEmpty(reason))
             .build();
-    return toView(call(() -> stub().revokeRole(request)));
+    return toView(command(s -> s.revokeRole(request)));
   }
 
   public UserView setUserEnabled(String userId, boolean enabled, String reason) {
@@ -141,49 +157,11 @@ public class IdentityGrpcClient {
             .setEnabled(enabled)
             .setReason(nullToEmpty(reason))
             .build();
-    return toView(call(() -> stub().setUserEnabled(request)));
-  }
-
-  private IdentityServiceGrpc.IdentityServiceBlockingStub stub() {
-    return stub.withDeadlineAfter(deadline.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
-  }
-
-  private static <T> T call(java.util.function.Supplier<T> action) {
-    try {
-      return action.get();
-    } catch (StatusRuntimeException ex) {
-      String description =
-          ex.getStatus().getDescription() == null ? "" : ex.getStatus().getDescription();
-      throw switch (ex.getStatus().getCode()) {
-        case PERMISSION_DENIED, UNAUTHENTICATED ->
-            new UserAdministrationException(
-                UserAdministrationException.Kind.FORBIDDEN, description);
-        case NOT_FOUND ->
-            new UserAdministrationException(
-                UserAdministrationException.Kind.NOT_FOUND, description);
-        case ALREADY_EXISTS ->
-            new UserAdministrationException(
-                UserAdministrationException.Kind.ALREADY_EXISTS, description);
-        case FAILED_PRECONDITION ->
-            new UserAdministrationException(UserAdministrationException.Kind.CONFLICT, description);
-        case INVALID_ARGUMENT ->
-            new UserAdministrationException(UserAdministrationException.Kind.INVALID, description);
-        default -> new IdentityServiceException("Identity service unavailable", ex);
-      };
-    }
+    return toView(command(s -> s.setUserEnabled(request)));
   }
 
   private static Role toRole(String name) {
-    try {
-      Role role = Role.valueOf(name == null ? "" : name.strip());
-      if (role != Role.ROLE_UNSPECIFIED && role != Role.UNRECOGNIZED) {
-        return role;
-      }
-    } catch (IllegalArgumentException unknown) {
-      // falls through to the same error as an unspecified role
-    }
-    throw new UserAdministrationException(
-        UserAdministrationException.Kind.INVALID, "role must be one of the platform roles");
+    return Role.valueOf(name);
   }
 
   private static UserView toView(User user) {

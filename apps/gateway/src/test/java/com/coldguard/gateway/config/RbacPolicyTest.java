@@ -129,6 +129,19 @@ class RbacPolicyTest {
             identityGrpcClient.listUsers(
                 org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
         .willReturn(new IdentityGrpcClient.UserPage(List.of(), 0, 20, 0, 0));
+    // The incident routes exist now: any answer will do, only the status of the security chain is
+    // under test.
+    var view = com.coldguard.incident.grpc.v1.IncidentView.getDefaultInstance();
+    given(incidentGrpcClient.listIncidents(org.mockito.ArgumentMatchers.any()))
+        .willReturn(com.coldguard.incident.grpc.v1.ListIncidentsResponse.getDefaultInstance());
+    given(incidentGrpcClient.getIncident(org.mockito.ArgumentMatchers.any())).willReturn(view);
+    given(incidentGrpcClient.acknowledgeIncident(org.mockito.ArgumentMatchers.any()))
+        .willReturn(view);
+    given(incidentGrpcClient.escalateIncident(org.mockito.ArgumentMatchers.any())).willReturn(view);
+    given(incidentGrpcClient.createIncident(org.mockito.ArgumentMatchers.any()))
+        .willReturn(com.coldguard.incident.grpc.v1.CreateIncidentResponse.getDefaultInstance());
+    given(incidentGrpcClient.closeIncident(org.mockito.ArgumentMatchers.any()))
+        .willReturn(com.coldguard.incident.grpc.v1.CloseIncidentResponse.getDefaultInstance());
   }
 
   private int statusFor(HttpMethod method, String path, Role role) throws Exception {

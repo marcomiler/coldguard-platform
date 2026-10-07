@@ -2,6 +2,8 @@ package com.coldguard.gateway.api.incident;
 
 import com.coldguard.common.grpc.v1.PageRequest;
 import com.coldguard.gateway.api.common.PageResponse;
+import com.coldguard.incident.grpc.v1.CloseIncidentRequest;
+import com.coldguard.incident.grpc.v1.CreateIncidentRequest;
 import com.coldguard.incident.grpc.v1.IncidentView;
 import com.coldguard.incident.grpc.v1.ListIncidentsRequest;
 import com.google.protobuf.Timestamp;
@@ -45,6 +47,32 @@ final class IncidentRestMapper {
       request.setCreatedTo(timestamp(createdTo));
     }
     return request.build();
+  }
+
+  static CreateIncidentRequest create(
+      com.coldguard.gateway.api.incident.CreateIncidentRequest request, String correlationId) {
+    return CreateIncidentRequest.newBuilder()
+        .setAssetId(request.assetId())
+        .setAssetCriticality(
+            com.coldguard.incident.grpc.v1.Criticality.valueOf(
+                "CRITICALITY_" + request.assetCriticality().name()))
+        .setSensorId(request.sensorId())
+        .setAnomalyType(request.anomalyType())
+        .setMagnitude(
+            com.coldguard.incident.grpc.v1.Magnitude.valueOf(
+                "MAGNITUDE_" + request.magnitude().name()))
+        .setPersistent(Boolean.TRUE.equals(request.persistent()))
+        .setCorrelationId(correlationId == null ? "" : correlationId)
+        .build();
+  }
+
+  static CloseIncidentRequest close(
+      String incidentId, com.coldguard.gateway.api.incident.CloseIncidentRequest request) {
+    return CloseIncidentRequest.newBuilder()
+        .setIncidentId(incidentId)
+        .setCause(request.cause())
+        .setResolutionComment(request.resolutionComment())
+        .build();
   }
 
   static IncidentResponse toRest(IncidentView v) {

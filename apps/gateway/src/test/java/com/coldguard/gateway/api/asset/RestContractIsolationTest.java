@@ -19,7 +19,14 @@ class RestContractIsolationTest {
   private static final List<Path> SOURCES =
       List.of(
           Path.of("src/main/java/com/coldguard/gateway/api/asset"),
-          Path.of("src/main/java/com/coldguard/gateway/api/telemetry"));
+          Path.of("src/main/java/com/coldguard/gateway/api/telemetry"),
+          Path.of("src/main/java/com/coldguard/gateway/api/incident"),
+          Path.of("src/main/java/com/coldguard/gateway/api/audit"),
+          Path.of("src/main/java/com/coldguard/gateway/api/metrics"),
+          Path.of("src/main/java/com/coldguard/gateway/api/user"),
+          Path.of("src/main/java/com/coldguard/gateway/api/auth"),
+          Path.of("src/main/java/com/coldguard/gateway/api/common"),
+          Path.of("src/main/java/com/coldguard/gateway/api/error"));
   private static final Pattern GENERATED =
       Pattern.compile("import com\\.coldguard\\.[a-z]+\\.grpc\\.");
 

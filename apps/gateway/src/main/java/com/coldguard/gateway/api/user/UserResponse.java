@@ -1,9 +1,9 @@
-package com.coldguard.gateway.api;
+package com.coldguard.gateway.api.user;
 
 import com.coldguard.gateway.infrastructure.IdentityGrpcClient.UserView;
 import java.util.List;
 
-public record UserHttpResponse(
+public record UserResponse(
     String userId,
     String username,
     String email,
@@ -12,8 +12,8 @@ public record UserHttpResponse(
     boolean enabled,
     String createdAt) {
 
-  static UserHttpResponse of(UserView user) {
-    return new UserHttpResponse(
+  static UserResponse of(UserView user) {
+    return new UserResponse(
         user.userId(),
         user.username(),
         user.email(),

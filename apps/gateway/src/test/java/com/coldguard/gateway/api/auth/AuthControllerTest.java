@@ -1,4 +1,4 @@
-package com.coldguard.gateway.api;
+package com.coldguard.gateway.api.auth;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,10 +7,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.coldguard.gateway.config.SecurityConfig;
+import com.coldguard.gateway.infrastructure.DownstreamCallException;
 import com.coldguard.gateway.infrastructure.IdentityGrpcClient;
-import com.coldguard.gateway.infrastructure.IdentityServiceException;
 import com.coldguard.gateway.infrastructure.InvalidCredentialsException;
 import com.coldguard.gateway.infrastructure.JwtTokenIssuer;
+import io.grpc.Status;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -88,14 +89,20 @@ class AuthControllerTest {
   }
 
   @Test
-  void identityOutageIsABadGatewayThatDoesNotLeakDetails() throws Exception {
+  void identityOutageIsServiceUnavailableThatDoesNotLeakDetails() throws Exception {
     given(identity.verifyCredentials("marta", "pw"))
-        .willThrow(new IdentityServiceException("boom", new RuntimeException("host:9093")));
+        .willThrow(
+            new DownstreamCallException(
+                "incident-service",
+                Status.Code.UNAVAILABLE,
+                null,
+                "io exception host:9093",
+                new RuntimeException("host:9093")));
 
     mockMvc
         .perform(post(LOGIN).contentType("application/json").content(body("marta", "pw")))
-        .andExpect(status().isBadGateway())
-        .andExpect(jsonPath("$.code").value("IDENTITY_SERVICE_UNAVAILABLE"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("UPSTREAM_UNAVAILABLE"))
         .andExpect(
             content()
                 .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("9093"))));
