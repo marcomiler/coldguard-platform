@@ -31,12 +31,17 @@ public class NotificationLedger {
   private final NotificationLedgerRepository repository;
   private final DomainEventPublisher events;
   private final Clock clock;
+  private final NotificationMetrics metrics;
 
   NotificationLedger(
-      NotificationLedgerRepository repository, DomainEventPublisher events, Clock clock) {
+      NotificationLedgerRepository repository,
+      DomainEventPublisher events,
+      Clock clock,
+      NotificationMetrics metrics) {
     this.repository = repository;
     this.events = events;
     this.clock = clock;
+    this.metrics = metrics;
   }
 
   /**
@@ -66,6 +71,7 @@ public class NotificationLedger {
   @Transactional
   public void recordSent(UUID requestId, String recipientUserId) {
     repository.markSent(requestId, recipientUserId, clock.instant());
+    metrics.sent();
     refresh(requestId);
   }
 
@@ -84,6 +90,7 @@ public class NotificationLedger {
             .max()
             .orElse(1);
     publishFailure(requestId, FailureCategory.PERMANENT, attempts);
+    metrics.failed(FailureCategory.PERMANENT);
     refresh(requestId);
   }
 
@@ -103,6 +110,7 @@ public class NotificationLedger {
                 requestId, d.recipientUserId(), FailureCategory.RETRIES_EXHAUSTED));
     int attempts = pending.stream().mapToInt(Delivery::attempts).max().orElse(1);
     publishFailure(requestId, FailureCategory.RETRIES_EXHAUSTED, attempts);
+    metrics.failed(FailureCategory.RETRIES_EXHAUSTED);
     refresh(requestId);
   }
 

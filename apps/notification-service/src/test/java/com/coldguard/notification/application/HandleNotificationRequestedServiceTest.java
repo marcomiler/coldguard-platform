@@ -17,11 +17,28 @@ import org.junit.jupiter.api.Test;
 
 class HandleNotificationRequestedServiceTest {
 
+  private int sentCount;
+  private final java.util.List<com.coldguard.notification.domain.FailureCategory> failures =
+      new java.util.ArrayList<>();
   private final InMemoryLedger repository = new InMemoryLedger();
   private final CapturedEvents events = new CapturedEvents();
   private final ScriptedSender sender = new ScriptedSender();
   private final NotificationLedger ledger =
-      new NotificationLedger(repository, events, Clock.systemUTC());
+      new NotificationLedger(
+          repository,
+          events,
+          Clock.systemUTC(),
+          new NotificationMetrics() {
+            @Override
+            public void sent() {
+              sentCount++;
+            }
+
+            @Override
+            public void failed(com.coldguard.notification.domain.FailureCategory category) {
+              failures.add(category);
+            }
+          });
   private final HandleNotificationRequestedService service =
       new HandleNotificationRequestedService(ledger, NotificationFixtures.RENDERER, sender);
 
@@ -112,5 +129,22 @@ class HandleNotificationRequestedServiceTest {
     ledger.recordRetriesExhausted(REQUEST_ID);
 
     assertThat(events.published).isEmpty();
+  }
+
+  @Test
+  void deliveriesAndFailuresAreCountedByCategory() {
+    sender.answers.put("u1", new SendResult.PermanentFailure("rejected"));
+    sender.answers.put("u3", new SendResult.TransientFailure("timeout"));
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> service.handle(request("u1", "u2", "u3")))
+        .isInstanceOf(TransientDeliveryException.class);
+
+    ledger.recordRetriesExhausted(REQUEST_ID);
+
+    assertThat(sentCount).isEqualTo(1);
+    assertThat(failures)
+        .containsExactly(
+            com.coldguard.notification.domain.FailureCategory.PERMANENT,
+            com.coldguard.notification.domain.FailureCategory.RETRIES_EXHAUSTED);
   }
 }

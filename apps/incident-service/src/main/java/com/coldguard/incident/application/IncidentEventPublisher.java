@@ -24,17 +24,23 @@ class IncidentEventPublisher {
   private final DomainEventPublisher publisher;
   private final NotificationRecipients recipients;
   private final IncidentAuditTrail audit;
+  private final IncidentObserver observer;
 
   IncidentEventPublisher(
-      DomainEventPublisher publisher, NotificationRecipients recipients, IncidentAuditTrail audit) {
+      DomainEventPublisher publisher,
+      NotificationRecipients recipients,
+      IncidentAuditTrail audit,
+      IncidentObserver observer) {
     this.publisher = publisher;
     this.recipients = recipients;
     this.audit = audit;
+    this.observer = observer;
   }
 
   /** Audits the transition and, when it is a catalogued event, emits it through the outbox. */
   void publish(IncidentEvent event, EventActor actor) {
     audit.record(event, actor);
+    observer.transitioned(event);
     switch (event) {
       case IncidentEvent.Created created -> {
         Incident i = created.incident();

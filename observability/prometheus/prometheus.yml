@@ -5,3 +5,48 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  # Every service exposes /actuator/prometheus on its own HTTP port, inside the Compose network
+  # only (the Gateway uses its separate management port).
+  - job_name: gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["gateway:8090"]
+  - job_name: asset-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["asset-service:8081"]
+  - job_name: telemetry-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["telemetry-service:8082"]
+  - job_name: incident-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["incident-service:8083"]
+  - job_name: notification-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["notification-service:8084"]
+  # Only present with the `sim` Compose profile; DOWN otherwise.
+  - job_name: sensor-simulator
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["sensor-simulator:8085"]
+
+  # Broker metrics (plugin rabbitmq_prometheus): queue depth, dead-letter queues, consumers.
+  - job_name: rabbitmq
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  # Per-queue depth (ready, unacknowledged) for every queue and dead-letter queue.
+  - job_name: rabbitmq-queues
+    metrics_path: /metrics/detailed
+    params:
+      family: [queue_coarse_metrics]
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]

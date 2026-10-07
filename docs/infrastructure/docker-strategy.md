@@ -27,10 +27,16 @@ infraestructura ya confirmadas en `docs/architecture/tech-stack.md`:
 | `prometheus` | Observabilidad — métricas | Imagen oficial `prometheus` |
 | `grafana` | Observabilidad — paneles | Imagen oficial `grafana` |
 | `loki` | Observabilidad — logs | Imagen oficial `loki` |
+| `otel-collector` | Observabilidad — punto único OTLP de trazas | Imagen oficial `opentelemetry-collector` |
+| `tempo` | Observabilidad — trazas | Imagen oficial `tempo` |
+| `alloy` | Observabilidad — recolección de logs de contenedores hacia Loki | Imagen oficial `alloy` |
 
-La topología interna del stack de observabilidad (si hay un colector OpenTelemetry intermedio
-entre los servicios backend y Prometheus/Loki) sigue sin definir — mismo TODO ya señalado en
-`docs/architecture/deployment-view.md`; no se inventa aquí.
+Topología de observabilidad (perfil `observability`, DEC-019): los servicios exportan trazas por
+OTLP/HTTP a `otel-collector`, que las reenvía a `tempo`; Prometheus raspa `/actuator/prometheus` de
+cada servicio y el plugin `rabbitmq_prometheus` del broker (incluida la profundidad por cola);
+`alloy` lee el stdout JSON de los contenedores y lo envía a `loki`; Grafana provisiona datasources
+(con enlace de `traceId` a Tempo) y tres dashboards desde `observability/grafana/`. Imágenes
+fijadas: `otel/opentelemetry-collector:0.114.0`, `grafana/tempo:2.6.1`, `grafana/alloy:v1.5.1`.
 
 ## Build de imágenes (servicios propios)
 
@@ -91,6 +97,6 @@ quedan para la implementación del compose file, no para este documento de estra
 
 - Distribución de recursos (CPU/memoria) por contenedor: no definida (mismo TODO de
   `docs/architecture/deployment-view.md`).
-- Colector OpenTelemetry intermedio (si aplica): pendiente.
+- Colector OpenTelemetry intermedio: resuelto (`otel-collector`, perfil `observability`).
 - `deploy/local/docker-compose.yml`, `Dockerfile` por servicio y `.env.example`: implementación
   futura, no incluida en este cambio de documentación.

@@ -63,6 +63,11 @@ final class GrpcServices {
     }
 
     @Bean
+    com.coldguard.incident.application.IncidentObserver observer() {
+      return event -> {};
+    }
+
+    @Bean
     NotificationRecipients recipients() {
       return role -> List.of();
     }

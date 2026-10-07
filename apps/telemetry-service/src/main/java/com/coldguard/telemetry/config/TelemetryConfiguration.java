@@ -62,6 +62,7 @@ class TelemetryConfiguration {
       SensorConditionRepository conditions,
       DomainEventPublisher events,
       ConnectivityMetrics metrics,
+      com.coldguard.commons.observability.BusinessEventLogger businessEvents,
       Clock clock,
       PlatformTransactionManager transactionManager,
       TelemetryProperties properties) {
@@ -70,6 +71,7 @@ class TelemetryConfiguration {
         conditions,
         events,
         metrics,
+        businessEvents,
         clock,
         transactionManager,
         connectivity.toleranceFactor(),

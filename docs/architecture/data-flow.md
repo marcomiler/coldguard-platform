@@ -58,8 +58,8 @@ Campos de correlación permitidos y prohibidos, y el detalle de qué se registra
 - **Redacción de secretos y datos sensibles en telemetría**: previsto (regla ya vigente: nunca
   registrar tokens JWT, credenciales, cadenas de conexión, secretos ni payloads completos de
   telemetría en logs, trazas o eventos de negocio — `.claude/rules/security.md`,
-  `docs/operations/observability-strategy.md`); no hay evidencia de una implementación
-  verificada todavía.
+  `docs/operations/observability-strategy.md`); verificado en el stack local: una búsqueda en Loki de
+  patrones de token, `password`, `Authorization` y direcciones de correo no devuelve líneas.
 - **Control de acceso**: por rol, a nivel de CU (ADR-007), con datos de usuarios/roles propiedad
   del módulo interno Identity & Access, dentro de Incident Service (DEC-004, DEC-008); el mapeo
   explícito rol→endpoint sigue pendiente de operacionalizar para Sprint 4/RBAC (ya señalado como

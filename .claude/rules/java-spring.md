@@ -68,10 +68,12 @@ rule, or a skill ever states a different version as current, that's stale — ch
 ## Spring Boot 4.1.1 conventions
 
 These reflect what Spring Boot 4.1.1 actually makes available. Verified against the `pom.xml`
-files: Spring gRPC and Flyway are already adopted (`gateway`, `incident-service`; DEC-012);
-JSpecify and an OpenTelemetry starter are **not** adopted in any module yet, and `asset-service`,
-`telemetry-service` and `notification-service` still contain only package placeholders. Treat the
-items below as "available to use" unless the sentence says otherwise.
+files: Spring gRPC (DEC-012) and Flyway are adopted in the services that use them, and the
+OpenTelemetry starter and the Prometheus registry are in the root `pom.xml`, so every module has
+them. JSpecify is **not** adopted in any module yet. All six runnable modules (`gateway`,
+`asset-service`, `telemetry-service`, `incident-service`, `notification-service` and
+`simulator/sensor-simulator`) contain real code. Treat the items below as "available to use" unless
+the sentence says otherwise.
 
 - **Declarative HTTP clients**: register `@HttpExchange` interfaces in groups via
   `@ImportHttpServices` on a configuration class (the "consumer-driven" model — you annotate your
@@ -91,10 +93,13 @@ items below as "available to use" unless the sentence says otherwise.
   `org.springframework.lang.Nullable`/`@NonNull`. Prefer JSpecify in new domain/application code
   over Spring's own annotations, now that 4.1.1 is the pinned version — there's no earlier-version
   constraint holding this back anymore.
-- **Observability**: the `spring-boot-starter-opentelemetry` starter bundles the relevant
-  Micrometer dependencies and OTLP export behind one dependency, instead of wiring
-  `micrometer-tracing-bridge-otel` and a Micrometer OTLP registry by hand. Not yet added to any
-  module's `pom.xml`; DEC-011 also notes `micrometer-registry-prometheus` isn't wired in either.
+- **Observability** (adopted, SPEC-011): `spring-boot-starter-opentelemetry` (OTLP traces) and
+  `micrometer-registry-prometheus` are root dependencies; shared defaults live in
+  `libs/coldguard-commons/src/main/resources/coldguard-observability.yml` (import it with
+  `spring.config.import: optional:classpath:coldguard-observability.yml`). Business-event logs go
+  through `BusinessEventLogger` (after commit); never put ids with high cardinality in meter tags.
+  The Outbox keeps the producer's `traceparent`, so keep `spring.rabbitmq.template.observation-enabled`
+  off. Operations: `docs/operations/runbooks.md`.
 - **Exception handling** (version-independent — apply now): define a project-specific domain
   exception hierarchy per bounded context (`docs/domain/bounded-contexts.md`); translate
   infrastructure exceptions (JPA/`DataAccessException`, AMQP/`AmqpException`, gRPC

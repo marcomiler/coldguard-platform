@@ -117,5 +117,5 @@ consulta los registros de auditoría que cada servicio ya genera (RN-008) — ve
 ## TODO
 
 Formato de mensaje, versionado y topología (exchanges, colas, dead-letter): definidos en
-`contracts/events/README.md`. Pendiente solo la estrategia de reintentos del consumidor
-(`docs/specs/SPEC-003-mensajeria-confiable.md`).
+`contracts/events/README.md`. Los reintentos del consumidor, las DLQ y el Outbox están implementados (SPEC-003); el flujo de
+reproceso está en `docs/operations/runbooks.md`.

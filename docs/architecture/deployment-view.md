@@ -38,9 +38,9 @@ flowchart TB
 ```
 
 Comandos de arranque en `docs/operations/runbooks.md`. La topología interna del stack de
-observabilidad (si hay un colector intermedio, cómo se conectan Prometheus/Grafana/Loki entre
-sí) no está definida; el diagrama solo refleja que los servicios backend emiten hacia ella
-(RNF-002/RNF-004).
+observabilidad está definida en DEC-019 y `docs/infrastructure/docker-strategy.md`: OpenTelemetry
+Collector → Tempo (trazas), scrape directo de Prometheus (métricas), Alloy → Loki (logs), todo
+visualizado en Grafana (RNF-002/RNF-004).
 
 **Secretos locales (DEC-010)**: cada servicio lee su configuración sensible desde variables de
 entorno provistas por un archivo `.env` no versionado (excluido por `.gitignore`); `.env.example`
