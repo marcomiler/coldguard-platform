@@ -32,6 +32,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-amqp</artifactId>
     </dependency>
+    <!-- JavaMailSender for the SMTP adapter (Mailpit locally). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
     <!-- Spring Boot 4 moved Flyway auto-configuration into its own starter module;
          flyway-database-postgresql is required separately since Flyway 10+. -->
     <dependency>

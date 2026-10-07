@@ -1,0 +1,9 @@
+ColdGuard - Incidente creado
+
+Se ha creado un incidente de prioridad {{priority}}.
+
+Incidente: {{incidentId}}
+Activo:    {{assetId}}
+Sensor:    {{sensorId}}
+
+Revise el incidente en ColdGuard y reconozcalo dentro del plazo de su prioridad.
