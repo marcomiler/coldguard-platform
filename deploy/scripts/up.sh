@@ -63,7 +63,21 @@ if [[ "$OBSERVABILITY" == true ]]; then
 fi
 if [[ "$SIMULATOR" == true ]]; then PROFILES+=(--profile sim); fi
 
-compose() { docker compose -f "$LOCAL_DIR/docker-compose.yml" --env-file "$ENV_FILE" ${PROFILES[@]+"${PROFILES[@]}"} "$@"; }
+env_value() { grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- || true; }
+
+# Optional: forward the e-mails that go to real addresses through an external SMTP server (see
+# deploy/local/docker-compose.mail-relay.yml). Only when both credentials are set.
+COMPOSE_FILES=(-f "$LOCAL_DIR/docker-compose.yml")
+RELAY_USER="${MAIL_RELAY_USERNAME:-$(env_value MAIL_RELAY_USERNAME)}"
+RELAY_PASS="${MAIL_RELAY_PASSWORD:-$(env_value MAIL_RELAY_PASSWORD)}"
+MAIL_RELAY=false
+if [[ -n "$RELAY_USER" && -n "$RELAY_PASS" ]]; then
+  COMPOSE_FILES+=(-f "$LOCAL_DIR/docker-compose.mail-relay.yml")
+  MAIL_RELAY=true
+  echo "Mail relay enabled: e-mails to real Gmail addresses are also sent through $(env_value MAIL_RELAY_HOST | sed 's/^$/smtp.gmail.com/')."
+fi
+
+compose() { docker compose "${COMPOSE_FILES[@]}" --env-file "$ENV_FILE" ${PROFILES[@]+"${PROFILES[@]}"} "$@"; }
 
 wait_healthy() {
   echo "Waiting for the containers to be healthy (timeout ${TIMEOUT_SECONDS}s)..."
@@ -103,7 +117,7 @@ wait_healthy
 echo
 echo "Stack is up."
 echo "  Gateway (REST)  http://localhost:8080/api/v1"
-echo "  Mailpit         http://localhost:8025"
+echo "  Mailpit         http://localhost:8025$([[ "$MAIL_RELAY" == true ]] && echo '   (copies also go to the real inboxes)')"
 echo "  RabbitMQ        http://localhost:15672"
 if [[ "$OBSERVABILITY" == true ]]; then
   echo "  Grafana         http://localhost:3000   Prometheus http://localhost:9090"

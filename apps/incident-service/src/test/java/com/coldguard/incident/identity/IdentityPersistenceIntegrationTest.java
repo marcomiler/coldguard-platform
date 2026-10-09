@@ -29,6 +29,7 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
       "spring.grpc.server.port=0",
       "coldguard.identity.bootstrap.enabled=true",
       "coldguard.identity.bootstrap.demo-password=demo-password-1",
+      "coldguard.identity.bootstrap.emails.supervisor=supervisor.demo@example.test",
       "coldguard.identity.password.bcrypt-strength=4",
       "coldguard.identity.lockout.max-attempts=3"
     })
@@ -73,6 +74,14 @@ class IdentityPersistenceIntegrationTest {
         .isZero();
     assertThat(users.findByUsername("technician").orElseThrow().roles())
         .containsExactly(Role.MAINTENANCE_TECHNICIAN);
+  }
+
+  @Test
+  void bootstrapUsesTheConfiguredAddressAndKeepsThePlaceholderForTheRest() {
+    assertThat(users.findByUsername("supervisor").orElseThrow().email())
+        .isEqualTo("supervisor.demo@example.test");
+    assertThat(users.findByUsername("technician").orElseThrow().email())
+        .isEqualTo("technician@coldguard.local");
   }
 
   @Test

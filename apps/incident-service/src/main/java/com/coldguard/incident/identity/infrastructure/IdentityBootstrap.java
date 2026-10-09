@@ -5,6 +5,7 @@ import com.coldguard.incident.identity.application.ProvisionUserCommand;
 import com.coldguard.incident.identity.application.ProvisionUserService;
 import com.coldguard.incident.identity.application.UserAccountRepository;
 import com.coldguard.incident.identity.domain.UserAccount;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,13 +54,19 @@ class IdentityBootstrap implements ApplicationRunner {
       provisioning.provision(
           new ProvisionUserCommand(
               username,
-              username + "@coldguard.local",
+              demoEmail(username, props.bootstrap().emails()),
               "Demo " + role.name().toLowerCase().replace('_', ' '),
               password,
               Set.of(role),
               ACTOR));
       log.info("Created demo user {}", username);
     }
+  }
+
+  /** The configured address for this demo user, or the local placeholder when none is set. */
+  static String demoEmail(String username, Map<String, String> configured) {
+    String email = configured == null ? null : configured.get(username);
+    return email == null || email.isBlank() ? username + "@coldguard.local" : email.trim();
   }
 
   static String demoUsername(Role role) {

@@ -152,3 +152,26 @@ Nunca ejecutar `docker compose down -v` a mano sobre datos que se quieran conser
 | Grafana sin datos | Prometheus `/targets`; el job `sensor-simulator` está DOWN sin el perfil `sim` (esperado) |
 | Sin trazas en Tempo | ¿Se arrancó con `--with-observability`? Sin ese flag no se exportan |
 | `smoke-e2e.sh` falla en el correo | Mailpit caído o el servicio de notificaciones sin consumir; ver la cola `notification-service.notification-requested` |
+
+## 11. Guion de demo (3–5 minutos)
+
+Los tiempos son valores de demostración (marcadores académicos) derivados de los intervalos del
+simulador (5 s por lectura, persistencia de 3 lecturas) y de `check-interval` de conectividad
+(30 s); se ajustan tras cada ensayo.
+
+**Preparación** (antes de empezar, sin público): `deploy/scripts/reset-demo.sh --with-observability`
+deja el stack limpio y con datos sembrados. Abrir Grafana (`:3000`), Mailpit (`:8025`) y el frontend
+con sesión de `supervisor`.
+
+**Ejecución**: `deploy/scripts/start-demo-sim.sh` arranca el reloj de los escenarios
+(`generate-simulator-scenario.sh --demo`). Cada ensayo requiere `reset-demo.sh`: los incidentes
+abiertos no se cierran al reiniciar el simulador.
+
+| Desde el arranque | Qué ocurre | Qué mostrar |
+|---|---|---|
+| 0:00 | Lecturas normales (SN-VAC-001) | Lecturas llegando, sin incidentes |
+| ~0:15 | SN-LAC-001 (activo de criticidad alta): 2 lecturas fuera de rango y se recupera | Incidente P2: una sola lectura fuera de rango ya crea incidente; al no ser persistente, la urgencia queda en media. Sigue abierto aunque el sensor vuelva a rango: lo cierra el técnico |
+| ~0:55 | SN-VAC-002: 15 °C en la cámara de vacunas | Incidente P1 (impacto crítico, urgencia inmediata); correo en Mailpit |
+| ~1:55 | SN-PES-001: -10 °C en el congelador | Incidente de prioridad menor (activo de criticidad media) |
+| ~2:40–3:10 | SN-FRU-001 en silencio | Pérdida de conectividad detectada |
+| 4:10 | SN-FRU-001 reanuda | Fin de la demo |
