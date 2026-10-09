@@ -95,6 +95,13 @@ coldguard:
       # Local Compose only; creates one demo user per role. Needs DEMO_USERS_PASSWORD.
       enabled: ${IDENTITY_BOOTSTRAP_ENABLED:false}
       demo-password: ${DEMO_USERS_PASSWORD:}
+      # Address each demo user's notifications go to (empty keeps <username>@coldguard.local).
+      emails:
+        supervisor: ${DEMO_SUPERVISOR_EMAIL:}
+        technician: ${DEMO_TECHNICIAN_EMAIL:}
+        admin: ${DEMO_ADMIN_EMAIL:}
+        operator: ${DEMO_OPERATOR_EMAIL:}
+        auditor: ${DEMO_AUDITOR_EMAIL:}
   outbox:
     enabled: true
     poll-interval: 500ms

@@ -48,7 +48,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_incident_opened_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_incident_opened_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_incident_opened_total[$__range]) unless (coldguard_incident_opened_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -61,7 +61,9 @@
         "h": 4
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -88,7 +90,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_incident_acknowledged_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_incident_acknowledged_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_incident_acknowledged_total[$__range]) unless (coldguard_incident_acknowledged_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -101,7 +103,9 @@
         "h": 4
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -128,7 +132,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_incident_escalated_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_incident_escalated_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_incident_escalated_total[$__range]) unless (coldguard_incident_escalated_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -141,7 +145,9 @@
         "h": 4
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -168,7 +174,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_incident_closed_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_incident_closed_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_incident_closed_total[$__range]) unless (coldguard_incident_closed_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -181,7 +187,9 @@
         "h": 4
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -197,7 +205,7 @@
     {
       "id": 37,
       "type": "timeseries",
-      "title": "Incidents created by priority",
+      "title": "Incidents created by priority (cumulative)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -208,8 +216,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (priority) (increase(coldguard_incident_opened_total[5m]))",
-          "legendFormat": "created {{priority}}",
+          "expr": "sum by (priority) (coldguard_incident_opened_total)",
+          "legendFormat": "{{priority}}",
           "refId": "A"
         }
       ],
@@ -246,7 +254,7 @@
     {
       "id": 38,
       "type": "timeseries",
-      "title": "Incident lifecycle events",
+      "title": "Incident lifecycle events (cumulative)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -257,7 +265,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_incident_acknowledged_total[5m]))",
+          "expr": "sum(coldguard_incident_acknowledged_total) or vector(0)",
           "legendFormat": "acknowledged",
           "refId": "A"
         },
@@ -266,7 +274,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_incident_escalated_total[5m]))",
+          "expr": "sum(coldguard_incident_escalated_total) or vector(0)",
           "legendFormat": "escalated",
           "refId": "B"
         },
@@ -275,7 +283,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_incident_closed_total[5m]))",
+          "expr": "sum(coldguard_incident_closed_total) or vector(0)",
           "legendFormat": "closed",
           "refId": "C"
         }
@@ -485,7 +493,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_telemetry_connectivity_lost_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_telemetry_connectivity_lost_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_telemetry_connectivity_lost_total[$__range]) unless (coldguard_telemetry_connectivity_lost_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -498,7 +506,9 @@
         "h": 4
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -526,7 +536,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_asset_calibration_expired_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_asset_calibration_expired_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_asset_calibration_expired_total[$__range]) unless (coldguard_asset_calibration_expired_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -539,7 +549,9 @@
         "h": 4
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -566,7 +578,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_simulator_readings_dropped_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_simulator_readings_dropped_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_simulator_readings_dropped_total[$__range]) unless (coldguard_simulator_readings_dropped_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -579,7 +591,9 @@
         "h": 4
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -606,7 +620,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_simulator_readings_rejected_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_simulator_readings_rejected_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_simulator_readings_rejected_total[$__range]) unless (coldguard_simulator_readings_rejected_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -619,7 +633,9 @@
         "h": 4
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -726,7 +742,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_notification_failed_total[$__range])) or vector(0)",
+          "expr": "round((sum(increase(coldguard_notification_failed_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_notification_failed_total[$__range]) unless (coldguard_notification_failed_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -739,7 +755,9 @@
         "h": 8
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
@@ -766,7 +784,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(coldguard_notification_sent_total[$__range]))",
+          "expr": "round((sum(increase(coldguard_notification_sent_total[$__range])) or vector(0)) + (sum(min_over_time(coldguard_notification_sent_total[$__range]) unless (coldguard_notification_sent_total offset $__range)) or vector(0)))",
           "legendFormat": "",
           "refId": "A",
           "instant": true
@@ -779,7 +797,9 @@
         "h": 8
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {

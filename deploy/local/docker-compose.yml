@@ -162,6 +162,13 @@ services:
       # Local demo users, one per role, all with the same password (never used outside local).
       IDENTITY_BOOTSTRAP_ENABLED: "true"
       DEMO_USERS_PASSWORD: ${DEMO_USERS_PASSWORD:?set DEMO_USERS_PASSWORD in deploy/local/.env}
+      # Where each demo user's notifications go (empty keeps <username>@coldguard.local). Only
+      # applied when the user is created, so a change needs a clean database (reset-demo.sh).
+      DEMO_SUPERVISOR_EMAIL: ${DEMO_SUPERVISOR_EMAIL:-}
+      DEMO_TECHNICIAN_EMAIL: ${DEMO_TECHNICIAN_EMAIL:-}
+      DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-}
+      DEMO_OPERATOR_EMAIL: ${DEMO_OPERATOR_EMAIL:-}
+      DEMO_AUDITOR_EMAIL: ${DEMO_AUDITOR_EMAIL:-}
     volumes:
       - ./certs:/certs:ro
     # gRPC (9093) stays intentionally unexposed to the host, mTLS or not — only the Actuator

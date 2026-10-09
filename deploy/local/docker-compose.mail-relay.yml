@@ -1,0 +1,19 @@
+# Optional overlay: lets Mailpit forward the notification e-mails that go to real addresses (Gmail)
+# through an external SMTP server, so delivery can be checked in a real inbox. Everything stays
+# visible in Mailpit as well. Addresses that are not real (*@coldguard.local) are never forwarded.
+#
+# Used by deploy/scripts/up.sh only when MAIL_RELAY_USERNAME and MAIL_RELAY_PASSWORD are set in
+# deploy/local/.env (never versioned). For Gmail the password is an "app password" (Google account
+# with 2-step verification), not the account password.
+services:
+  mailpit:
+    environment:
+      MP_SMTP_RELAY_HOST: ${MAIL_RELAY_HOST:-smtp.gmail.com}
+      MP_SMTP_RELAY_PORT: ${MAIL_RELAY_PORT:-587}
+      MP_SMTP_RELAY_STARTTLS: ${MAIL_RELAY_STARTTLS:-true}
+      MP_SMTP_RELAY_AUTH: ${MAIL_RELAY_AUTH:-plain}
+      MP_SMTP_RELAY_USERNAME: ${MAIL_RELAY_USERNAME:-}
+      MP_SMTP_RELAY_PASSWORD: ${MAIL_RELAY_PASSWORD:-}
+      # Gmail only accepts the authenticated account as the sender.
+      MP_SMTP_RELAY_OVERRIDE_FROM: ${MAIL_RELAY_USERNAME:-}
+      MP_SMTP_RELAY_MATCHING: ${MAIL_RELAY_MATCHING:-.*@gmail\.com$}

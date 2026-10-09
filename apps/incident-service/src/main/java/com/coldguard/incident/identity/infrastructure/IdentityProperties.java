@@ -1,6 +1,7 @@
 package com.coldguard.incident.identity.infrastructure;
 
 import java.time.Duration;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -16,6 +17,13 @@ public record IdentityProperties(
   public record Password(
       @DefaultValue("8") int minLength, @DefaultValue("10") int bcryptStrength) {}
 
-  /** {@code demoPassword} is read from the environment and never has a default. */
-  public record Bootstrap(@DefaultValue("false") boolean enabled, String demoPassword) {}
+  /**
+   * {@code demoPassword} is read from the environment and never has a default. {@code emails} maps
+   * a demo username to the address its notifications go to; a user without an entry keeps the local
+   * placeholder address.
+   */
+  public record Bootstrap(
+      @DefaultValue("false") boolean enabled,
+      String demoPassword,
+      @DefaultValue Map<String, String> emails) {}
 }
