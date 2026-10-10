@@ -205,7 +205,7 @@
     {
       "id": 37,
       "type": "timeseries",
-      "title": "Incidents created by priority (cumulative)",
+      "title": "Incidents by priority at creation (cumulative)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -235,7 +235,7 @@
             "fillOpacity": 10,
             "showPoints": "never",
             "stacking": {
-              "mode": "normal"
+              "mode": "none"
             }
           }
         },
