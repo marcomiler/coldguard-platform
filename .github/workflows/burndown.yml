@@ -33,7 +33,7 @@ jobs:
           mkdir dist
           mv coldguard_burndown.html dist/index.html
 
-      - uses: actions/configure-pages@v4
+      - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v3
         with:
