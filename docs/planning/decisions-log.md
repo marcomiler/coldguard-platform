@@ -810,3 +810,22 @@ Decisiones confirmadas posteriores al cierre de Sprint 1, documentadas en su lug
   documenta con claridad. Los valores de demostración se definirán antes de la presentación final
   y se marcarán explícitamente como supuestos académicos, no como requisitos de negocio
   confirmados.
+
+## DEC-023 — Modelo y plazos del catálogo de solicitudes de servicio
+**Fecha:** 2026-11-02
+**Estado:** Aprobada como placeholder académico; el Product Owner puede revisarla
+### Contexto
+APF3 (Cap. 8.1) exige un catálogo de solicitudes de servicio. `docs/operations/service-requests.md`
+estaba diferido. No existe una matriz de plazos confirmada por el negocio (DEC-022).
+### Decisión
+- El catálogo distingue **solicitud de servicio** (pedido estándar y planificable), **incidente**
+  (RN-012, `incident-model.md`) y **cambio** (SPEC-013).
+- Cada solicitud tiene ID `SR-NNN`, un solicitante con rol de `stakeholders.md` (no se crean roles) y
+  una ruta del Gateway, script o runbook existente; lo que el MVP no soporta se lista aparte.
+- La prioridad de una solicitud usa solo P2 a P4 y **no** se calcula con la matriz de RN-012. Los
+  plazos objetivo (1, 3 y 5 días hábiles) son placeholder académico, no un SLA.
+- Las solicitudes se registran como issues de GitHub con la plantilla
+  `.github/ISSUE_TEMPLATE/service-request.md`.
+### Trazabilidad
+APF3 Cap. 8.1; `docs/operations/service-requests.md`; `docs/specs/SPEC-012-catalogo-solicitudes.md`;
+DEC-022.
