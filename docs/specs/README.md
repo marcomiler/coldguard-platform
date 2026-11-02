@@ -86,6 +86,42 @@ supuestos funcionales locales de cada spec y la estrategia técnica (formateador
 verificaciones) quedaron cerrados en DEC-021 y DEC-022 (valores placeholder académico). Donde un
 spec dice "confirmar con el PO", rige DEC-022.
 
+## Specs de APF3 (gestión del servicio, CI/CD, Azure y rendimiento)
+
+SPEC-001 a SPEC-011 cubren el MVP local. Los siguientes cubren los capítulos VIII a X del informe
+APF3 y el "Despliegue versión final" del sílabo. Los que tocan Azure (SPEC-015 a SPEC-017) producen
+código y documentación revisables; **crear recursos o ejecutar `terraform apply` requiere
+aprobación humana explícita** (`.claude/rules/infra.md`, `terraform.md`).
+
+| Orden | Spec | Cubre | Depende de |
+|---|---|---|---|
+| 12 | [SPEC-012 Catálogo de solicitudes](SPEC-012-catalogo-solicitudes.md) | Cap. 8.1 | — |
+| 13 | [SPEC-013 Gestión de cambios](SPEC-013-gestion-cambios.md) | Cap. 8.2 | SPEC-012 |
+| 14 | [SPEC-014 Pipeline CI](SPEC-014-pipeline-ci.md) | Cap. 9.1 | SPEC-001 |
+| 15 | [SPEC-015 Automatización de despliegues (CD)](SPEC-015-automatizacion-despliegues.md) | Cap. 9.2 | SPEC-013, SPEC-014, SPEC-016 |
+| 16 | [SPEC-016 Infraestructura Azure con Terraform](SPEC-016-infraestructura-azure-terraform.md) | Soporte 9.2 y despliegue final; ADR-012 | DEC-002, DEC-009, DEC-010 |
+| 17 | [SPEC-017 Despliegue de la versión final](SPEC-017-despliegue-version-final.md) | Despliegue versión final (semana 13) | SPEC-015, SPEC-016 |
+| 18 | [SPEC-018 Capacidad y rendimiento](SPEC-018-capacidad-y-rendimiento.md) | Cap. 10.1 y 10.2 | SPEC-011, SPEC-016 |
+| 19 | [SPEC-019 Cierre de APF3](SPEC-019-cierre-apf3.md) | Cap. 10.3, mapeo, evidencias, alineación | SPEC-012 a SPEC-018 |
+
+Orden sugerido de ejecución: 012 → 013 → 014 → 016 (ADR y módulos) → 015 → 018 (local) → 017 →
+018 (Azure, si aplica) → 019; el esqueleto de 019 se empieza pronto.
+
+Decisiones nuevas (registrar antes de implementar el slice afectado):
+
+| ID | Decisión | Registro | Bloquea |
+|---|---|---|---|
+| D-18 | Modelo y plazos placeholder del catálogo de solicitudes | DEC | SPEC-012 |
+| D-19 | Tipos de cambio y aprobación | DEC | SPEC-013 |
+| D-20 / D-21 | Herramientas de análisis/escaneo y fijado de acciones | DEC | SPEC-014 |
+| D-22 / D-23 | Registro de imágenes y OIDC | ADR-012 | SPEC-015, SPEC-016 |
+| D-24 | Versionado de imágenes | DEC | SPEC-015 |
+| ADR-012 | Infraestructura Azure (topología, estado de Terraform, mTLS en ACA, costos) | ADR nuevo (`new-adr`) | SPEC-016, SPEC-017 |
+| D-25 | Herramienta y umbrales de carga (placeholder) | DEC | SPEC-018 |
+
+Los capítulos XI a XIV (incidentes, monitoreo, DRP, conclusiones) corresponden al siguiente lote
+de specs (Sprint 7 y 8).
+
 ## Convenciones transversales (aplican a todos los specs)
 
 1. **Capas** (DEC-008, DEC-011): `api` (gRPC/REST, mapeo), `application` (casos de uso, puertos),
@@ -122,6 +158,14 @@ spec dice "confirmar con el PO", rige DEC-022.
     una migración ya aplicada.
 11. **Validación local de cada spec**: `mvn -q verify -DskipTests` compila; `docker compose ...
     up --build` levanta con healthchecks en verde; smoke manual descrito en cada spec.
+
+12. **Documentos académicos (SPEC-012 a SPEC-019)**: su texto pasa al informe de proyecto, por lo que
+    es autocontenido: sin rutas del repositorio ni identificadores internos de gestión (DEC, ADR,
+    SPEC) en el cuerpo; se describen por nombre. Contienen evidencia **real** (ejecutada y fechada,
+    con datos ficticios y sin secretos) y no dejan secciones "pendiente": lo que falta se genera o
+    se cierra el alcance de forma explícita. Las metas sin confirmar del negocio se rotulan
+    supuesto académico. La trazabilidad a ADR/DEC/SPEC vive en este directorio y en
+    `decisions-log.md`, no en el documento.
 
 ## Fuera de alcance de este conjunto
 
