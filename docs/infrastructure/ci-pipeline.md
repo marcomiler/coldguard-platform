@@ -73,8 +73,9 @@ de la base de vulnerabilidades NVD y alarga mucho la ejecución.
 
 ## 5. Resultados verificados
 
-Los controles se ejecutaron el 2 de noviembre de 2026 sobre una copia limpia de la rama principal
-(equivalente a un checkout de CI), con las mismas versiones de herramientas que usa el flujo.
+Los controles se ejecutaron primero en local, el 2 de noviembre de 2026, sobre una copia limpia de la
+rama principal (equivalente a un checkout de CI) y con las mismas versiones de herramientas que usa el
+flujo; después se confirmaron en GitHub Actions.
 
 | Control | Resultado |
 |---|---|
@@ -83,6 +84,26 @@ Los controles se ejecutaron el 2 de noviembre de 2026 sobre una copia limpia de 
 | Smoke con Compose desde cero | Correcto: plataforma arriba en **111 s** y **13 de 13 comprobaciones** superadas |
 | actionlint, hadolint, shellcheck | Correcto: 0 hallazgos sobre el flujo, los seis Dockerfile y los 12 scripts |
 | gitleaks | Correcto: 0 hallazgos en 45 commits |
+
+### Ejecución en GitHub Actions
+
+La solicitud de integración n.º 70 ejecutó el pipeline en GitHub Actions el 2 de noviembre de 2026
+(ejecución 41538907530, <https://github.com/marcomiler/coldguard-platform/actions/runs/41538907530>).
+Los diez trabajos que corresponden a una solicitud de integración terminaron en verde:
+
+| Trabajo | Resultado | Duración |
+|---|---|---|
+| Formato y lint | Correcto | 26 s |
+| Escaneo de secretos | Correcto | 9 s |
+| Construcción y pruebas | Correcto | 10 min 34 s |
+| Análisis estático (SpotBugs) | Correcto | 2 min |
+| Imagen gateway | Correcto | 52 s |
+| Imagen asset-service | Correcto | 49 s |
+| Imagen telemetry-service | Correcto | 51 s |
+| Imagen incident-service | Correcto | 1 min 5 s |
+| Imagen notification-service | Correcto | 50 s |
+| Imagen sensor-simulator | Correcto | 45 s |
+| Smoke con Compose | Omitido a propósito: solo corre al integrar a la rama principal o bajo demanda | — |
 
 ### Pruebas de que los controles detienen un cambio defectuoso
 
