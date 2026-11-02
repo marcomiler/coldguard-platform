@@ -1,6 +1,6 @@
 # Common template for every ColdGuard service image; only the module name differs.
 # Build context is the repository root (see deploy/local/docker-compose.yml).
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /workspace
 # The root reactor declares every module, so all POMs must be present for any single-module build.
 COPY pom.xml /workspace/pom.xml
