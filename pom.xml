@@ -24,7 +24,7 @@
     <!-- Resolved empirically via `mvn dependency:tree` against the spring-grpc-dependencies BOM
          below; kept in sync with it so the protoc/protoc-gen-grpc-java build-time plugins match
          the runtime library versions. -->
-    <spring-grpc.version>1.0.3</spring-grpc.version>
+    <spring-grpc.version>1.1.2</spring-grpc.version>
     <grpc.version>1.77.1</grpc.version>
     <protobuf.version>4.33.4</protobuf.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
