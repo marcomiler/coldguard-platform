@@ -66,6 +66,7 @@ Propiedades transversales:
 2. Un PR correcto pasa todos los jobs en verde y publica reportes.
 3. `docker-build` construye las 5 imágenes y `compose-smoke` termina con código 0 en `master`.
 4. Ningún workflow contiene secretos ni usa acciones sin fijar.
+**Estado 2026-11-02:** implementados `ci.yml`, `dependabot.yml`, `.hadolint.yaml`, `.gitleaks.toml`, `config/spotbugs-exclude.xml`, `docs/infrastructure/ci-pipeline.md` y DEC-025. Criterios 3, 4 y 5 verificados en local sobre una copia limpia (740 pruebas, SpotBugs 0, smoke 13/13); criterios 1 y 2 verificados por herramienta en local. **Falta la evidencia de ejecución en GitHub Actions**, que requiere `push` (con confirmación del usuario) y la protección de rama manual.
 5. `docs/infrastructure/` documenta el pipeline (diagrama, jobs, gates y cómo reproducir cada uno
    en local) y `consistency-check` pasa.
 

@@ -1,0 +1,5 @@
+# DL3008: the runtime image installs curl from the base distribution for the health check;
+# pinning an apt version would break the build on every repository update.
+ignored:
+  - DL3008
+failure-threshold: warning

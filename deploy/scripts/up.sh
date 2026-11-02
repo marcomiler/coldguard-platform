@@ -104,7 +104,8 @@ if [[ "$SIMULATOR" == true ]]; then
   if [[ ! -f "$LOCAL_DIR/simulator/scenario.yml" ]]; then
     : > "$LOCAL_DIR/simulator/scenario.yml"
   fi
-  compose up -d ${BUILD_FLAG[@]+"${BUILD_FLAG[@]}"} $(compose config --services | grep -vx 'sensor-simulator')
+  mapfile -t BASE_SERVICES < <(compose config --services | grep -vx 'sensor-simulator')
+  compose up -d ${BUILD_FLAG[@]+"${BUILD_FLAG[@]}"} "${BASE_SERVICES[@]}"
   wait_healthy
   echo "Seeding the demo data..."
   "$REPO_ROOT/deploy/scripts/seed-demo.sh"

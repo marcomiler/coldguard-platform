@@ -1,5 +1,7 @@
 # ColdGuard Platform
 
+[![CI](https://github.com/marcomiler/coldguard-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/marcomiler/coldguard-platform/actions/workflows/ci.yml)
+
 Backend y documentación principal de ColdGuard.
 
 ## Objetivo
