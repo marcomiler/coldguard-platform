@@ -829,3 +829,23 @@ estaba diferido. No existe una matriz de plazos confirmada por el negocio (DEC-0
 ### Trazabilidad
 APF3 Cap. 8.1; `docs/operations/service-requests.md`; `docs/specs/SPEC-012-catalogo-solicitudes.md`;
 DEC-022.
+
+## DEC-024 — Modelo de gestión de cambios
+**Fecha:** 2026-11-02
+**Estado:** Aprobada como placeholder académico; el Product Owner puede revisarla
+### Contexto
+APF3 (Cap. 8.2) exige un proceso de gestión de cambios. Las reglas del proyecto (commits a petición,
+`terraform apply` con aprobación, ADR/DEC para decisiones) ya funcionaban como política dispersa.
+### Decisión
+- Cuatro tipos de cambio: Estándar, Normal, Emergencia e Infraestructura, con aprobación y registro
+  propios. Todo `apply`, `destroy` o `import` de Terraform es Infraestructura y requiere aprobación
+  humana explícita previa.
+- El riesgo se clasifica con impacto (bajo a crítico) por probabilidad de fallo (baja a alta). Un
+  riesgo Alto exige ensayo local y reversión probada.
+- Registro `CHG-NNN` para cambios Normal, Emergencia e Infraestructura; los Estándar quedan en su
+  solicitud de integración. Se permite registro retroactivo desde el historial real, rotulado así.
+- Plantillas de GitHub para ticket de cambio y para solicitud de integración. Ventanas y
+  congelamiento (24 h antes de cada entrega) son supuestos académicos.
+### Trazabilidad
+APF3 Cap. 8.2; `docs/operations/change-management.md`; `docs/specs/SPEC-013-gestion-cambios.md`;
+`.claude/rules/git-workflow.md`, `.claude/rules/terraform.md`; DEC-023.
