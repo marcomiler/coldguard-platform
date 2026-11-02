@@ -66,9 +66,11 @@ gradual), ADR aparte.
 1. El documento cubre los cuatro tipos con aprobador y registro; ningún paso contradice las reglas
    `.claude/rules/*`.
 2. Existen las plantillas y se probó que GitHub las ofrece al crear issue/PR.
-3. El registro `CHG-NNN` tiene al menos dos entradas reales con enlace a PR o commit.
+3. El registro `CHG-NNN` tiene al menos dos entradas reales con enlace a PR o commit. **Hecho el
+   2026-11-02: CHG-001 a CHG-006 (cinco retroactivas del historial y la prueba de reversión).**
 4. El plan de rollback de aplicación se **prueba en local** (volver a la imagen anterior con
-   Compose) y se anexa la salida.
+   Compose) y se anexa la salida. **Hecho el 2026-11-02:** cambio y reversión del Gateway, 9 s,
+   comportamiento verificado (HTTP 400 → 403 → 400).
 5. `consistency-check` sin hallazgos nuevos.
 
 ## Tareas
