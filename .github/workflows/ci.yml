@@ -4,9 +4,72 @@ on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
+
+# Least privilege: no job needs to write to the repository.
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the run in progress; master is never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Pinned tool images: the same ones used to reproduce each check locally.
+  ACTIONLINT_IMAGE: rhysd/actionlint:1.7.7
+  HADOLINT_IMAGE: hadolint/hadolint:v2.12.0
+  SHELLCHECK_IMAGE: koalaman/shellcheck:v0.10.0
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.21.2
+  SPOTBUGS_PLUGIN: com.github.spotbugs:spotbugs-maven-plugin:4.9.8.2
 
 jobs:
+  lint:
+    name: Format and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Java formatting (Spotless)
+        run: mvn -B -ntp spotless:check
+
+      - name: Workflows (actionlint)
+        run: docker run --rm -v "$PWD:/repo" -w /repo "$ACTIONLINT_IMAGE" -color=false
+
+      - name: Dockerfiles (hadolint)
+        run: |
+          for dockerfile in apps/*/Dockerfile simulator/*/Dockerfile; do
+            echo "::group::$dockerfile"
+            docker run --rm -i -v "$PWD/.hadolint.yaml:/.hadolint.yaml:ro" "$HADOLINT_IMAGE" \
+              hadolint --config /.hadolint.yaml - < "$dockerfile"
+            echo "::endgroup::"
+          done
+
+      - name: Shell scripts (shellcheck)
+        run: docker run --rm -v "$PWD:/repo" -w /repo "$SHELLCHECK_IMAGE" -S warning deploy/scripts/*.sh
+
+  secrets-scan:
+    name: Secrets scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0 # full history: a secret removed in a later commit is still a leaked secret
+
+      - name: Scan the repository history (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS_IMAGE" \
+            detect --source=/repo --no-banner --redact
+
   build-and-test:
+    name: Build and test
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -23,17 +86,154 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
           java-version: "25"
           cache: maven
 
+      # The Gateway tests open mTLS channels with development certificates, which are never versioned.
+      - name: Generate development certificates
+        run: deploy/scripts/generate-dev-certs.sh
+
       - name: Build and test
-        run: mvn -B verify
+        run: mvn -B -ntp verify
 
       - name: Integration tests (incident-service, PostgreSQL)
-        run: mvn -B -pl apps/incident-service -am test -DexcludedGroups=
+        run: mvn -B -ntp -pl apps/incident-service -am test -DexcludedGroups=
+
+      - name: Test summary
+        if: always()
+        run: |
+          {
+            echo "### Test results"
+            echo ""
+            echo "| Module | Tests | Failures | Errors | Skipped |"
+            echo "|---|---:|---:|---:|---:|"
+            for dir in libs/*/ apps/*/ simulator/*/; do
+              reports="$dir/target/surefire-reports"
+              [ -d "$reports" ] || continue
+              totals=$(grep -h -o '<testsuite [^>]*' "$reports"/TEST-*.xml | awk '
+                { for (i = 1; i <= NF; i++) {
+                    split($i, kv, "=")
+                    gsub(/"/, "", kv[2])
+                    if (kv[1] == "tests") t += kv[2]
+                    if (kv[1] == "failures") f += kv[2]
+                    if (kv[1] == "errors") e += kv[2]
+                    if (kv[1] == "skipped") s += kv[2]
+                } }
+                END { printf "%d|%d|%d|%d", t, f, e, s }')
+              echo "| $(basename "$dir") | ${totals//|/ | } |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-reports
+          path: "**/target/surefire-reports/"
+          retention-days: 14
+          if-no-files-found: ignore
+
+  static-analysis:
+    name: Static analysis (SpotBugs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      # `package` and the check run in one reactor so each module resolves coldguard-commons from it.
+      - name: SpotBugs
+        run: >-
+          mvn -B -ntp package "$SPOTBUGS_PLUGIN:check"
+          -DskipTests -Dspotless.check.skip=true
+          -Dspotbugs.excludeFilterFile="$GITHUB_WORKSPACE/config/spotbugs-exclude.xml"
+          -Dspotbugs.threshold=Medium
+
+      - name: Upload SpotBugs reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: spotbugs-reports
+          path: "**/target/spotbugsXml.xml"
+          retention-days: 14
+          if-no-files-found: ignore
+
+  docker-build:
+    name: Image ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: gateway
+            dockerfile: apps/gateway/Dockerfile
+          - service: asset-service
+            dockerfile: apps/asset-service/Dockerfile
+          - service: telemetry-service
+            dockerfile: apps/telemetry-service/Dockerfile
+          - service: incident-service
+            dockerfile: apps/incident-service/Dockerfile
+          - service: notification-service
+            dockerfile: apps/notification-service/Dockerfile
+          - service: sensor-simulator
+            dockerfile: simulator/sensor-simulator/Dockerfile
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # Builds only: images are published by the release workflow, never by CI.
+      - name: Build the image
+        run: docker build -f "${{ matrix.dockerfile }}" -t "coldguard/${{ matrix.service }}:ci" .
+
+      - name: The image starts a Java 25 runtime
+        run: docker run --rm --entrypoint java "coldguard/${{ matrix.service }}:ci" -version
+
+  compose-smoke:
+    name: Compose end-to-end smoke
+    # Slow (builds every image and runs the whole stack): only after merging or on demand.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master')
+    needs: [lint, secrets-scan, build-and-test, docker-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate the Compose file
+        run: |
+          cp deploy/local/.env.example deploy/local/.env
+          docker compose -f deploy/local/docker-compose.yml config -q
+
+      - name: Start the stack (up.sh creates the certificates)
+        run: deploy/scripts/up.sh
+
+      - name: Seed the demo data
+        run: deploy/scripts/seed-demo.sh
+
+      - name: End-to-end smoke test
+        run: deploy/scripts/smoke-e2e.sh
+
+      - name: Collect service logs
+        if: failure()
+        run: docker compose -f deploy/local/docker-compose.yml logs --no-color --tail 300 > compose-logs.txt
+
+      - name: Upload service logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: compose-logs
+          path: compose-logs.txt
+          retention-days: 7
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f deploy/local/docker-compose.yml down -v
