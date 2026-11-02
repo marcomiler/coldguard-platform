@@ -1,0 +1,8 @@
+# Extends the default ruleset; only documented false positives are allowed here.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented false positives"
+# LogSecretsTest declares a fake password on purpose: it asserts the value never reaches the logs.
+paths = ['''apps/gateway/src/test/java/com/coldguard/gateway/config/LogSecretsTest\.java''']

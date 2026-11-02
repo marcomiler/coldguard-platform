@@ -849,3 +849,26 @@ APF3 (Cap. 8.2) exige un proceso de gestión de cambios. Las reglas del proyecto
 ### Trazabilidad
 APF3 Cap. 8.2; `docs/operations/change-management.md`; `docs/specs/SPEC-013-gestion-cambios.md`;
 `.claude/rules/git-workflow.md`, `.claude/rules/terraform.md`; DEC-023.
+
+## DEC-025 — Herramientas y gates del pipeline de integración continua
+**Fecha:** 2026-11-02
+**Estado:** Aprobada
+### Contexto
+APF3 (Cap. 9.1) exige un pipeline de CI con los quality gates de `CLAUDE.md`. El `ci.yml` previo solo
+ejecutaba `mvn verify`, y en un checkout limpio fallaba: las pruebas del Gateway requieren los
+certificados mTLS de desarrollo, que no se versionan.
+### Decisión
+- Gates: Spotless (ya en `verify`), `actionlint`, `hadolint`, `shellcheck`, `gitleaks` sobre todo el
+  historial, SpotBugs (4.9.8.2, verificado con Java 25, umbral Medium), pruebas unitarias y de
+  integración, build de las seis imágenes y smoke e2e con Compose en `master`.
+- Las herramientas externas corren como imágenes Docker con versión fijada; las acciones de GitHub se
+  fijan por SHA de commit. Permisos `contents: read`; sin secretos.
+- Excepciones documentadas y acotadas: `hadolint` DL3008 (no se fija la versión de `curl` del sistema
+  base), SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` (inyección por constructor de Spring),
+  `CT_CONSTRUCTOR_THROW` (validación fail-fast de configuración) y las clases generadas por protoc;
+  `gitleaks` ignora solo la contraseña ficticia de `LogSecretsTest`.
+- Análisis de dependencias: Dependabot semanal (Maven, GitHub Actions y Docker). OWASP
+  Dependency-Check se descarta por requerir una clave de la NVD y tiempos largos.
+- La protección de la rama `master` (checks obligatorios) se configura a mano en GitHub.
+### Trazabilidad
+APF3 Cap. 9.1; `docs/infrastructure/ci-pipeline.md`; `docs/specs/SPEC-014-pipeline-ci.md`; DEC-021.
