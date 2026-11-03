@@ -1,0 +1,2 @@
+# Vulnerabilities accepted for the published images. One CVE per line, each with a reason and a date.
+# Empty on purpose: unfixed vulnerabilities are already skipped (--ignore-unfixed).

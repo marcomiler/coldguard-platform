@@ -1,5 +1,7 @@
 data "azurerm_subscription" "current" {}
 
+data "azurerm_client_config" "current" {}
+
 locals {
   tags = {
     project = var.project
@@ -92,6 +94,13 @@ resource "azurerm_role_assignment" "github_state" {
   scope                = azurerm_storage_account.state.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_user_assigned_identity.github.principal_id
+}
+
+# Owner does not include blob data access; whoever applies this layer also runs dev locally.
+resource "azurerm_role_assignment" "deployer_state" {
+  scope                = azurerm_storage_account.state.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
 }
 
 # --- Budget ------------------------------------------------------------------------------------

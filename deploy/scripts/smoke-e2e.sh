@@ -7,6 +7,9 @@
 # (deploy/scripts/up.sh, deploy/scripts/seed-demo.sh), plus curl and jq. It uses one demo sensor and
 # closes any open incident of its asset first, so it can be run repeatedly.
 #
+# Against a remote deployment: COLDGUARD_API_URL points at the Gateway and SMOKE_SKIP_MAIL=true skips
+# the Mailpit steps when its web UI is not reachable (the Azure environment exposes SMTP only).
+#
 # Usage: deploy/scripts/smoke-e2e.sh
 set -euo pipefail
 
@@ -16,6 +19,7 @@ SEED="$REPO_ROOT/deploy/local/demo-seed.json"
 API="${COLDGUARD_API_URL:-http://localhost:8080}/api/v1"
 MAILPIT="${MAILPIT_URL:-http://localhost:8025}/api/v1"
 WAIT_SECONDS="${SMOKE_WAIT_SECONDS:-60}"
+SKIP_MAIL="${SMOKE_SKIP_MAIL:-false}"
 
 for tool in curl jq; do
   command -v "$tool" >/dev/null || { echo "ERROR: '$tool' is required." >&2; exit 1; }
@@ -81,8 +85,10 @@ for open in $(jq -r '.items[].id' "$BODY"); do
 done
 pass "no open incident left for the asset"
 
-SUP_MAILS="$(mail_count supervisor@coldguard.local)"
-TECH_MAILS="$(mail_count technician@coldguard.local)"
+if [[ "$SKIP_MAIL" != "true" ]]; then
+  SUP_MAILS="$(mail_count supervisor@coldguard.local)"
+  TECH_MAILS="$(mail_count technician@coldguard.local)"
+fi
 
 # --- reading out of range (CU-015) ---------------------------------------------------------------
 call "$ADMIN" POST /telemetry/test-readings "$(jq -n --arg s "$SENSOR" --arg id "$(uuidgen | tr 'A-Z' 'a-z')" \
@@ -119,8 +125,12 @@ pass "escalated by the Supervisor"
 mails_arrived() {
   [[ "$(mail_count supervisor@coldguard.local)" -gt "$SUP_MAILS" && "$(mail_count technician@coldguard.local)" -gt "$TECH_MAILS" ]]
 }
-wait_for "the emails in Mailpit (Supervisor on creation, Technician on escalation)" mails_arrived
-pass "emails delivered to Mailpit (Supervisor and Technician)"
+if [[ "$SKIP_MAIL" == "true" ]]; then
+  pass "emails skipped (SMOKE_SKIP_MAIL=true)"
+else
+  wait_for "the emails in Mailpit (Supervisor on creation, Technician on escalation)" mails_arrived
+  pass "emails delivered to Mailpit (Supervisor and Technician)"
+fi
 
 # --- close (Technician) -----------------------------------------------------------------------------
 call "$SUPERVISOR" POST "/incidents/$ID/close" '{"cause":"x","resolutionComment":"y"}'

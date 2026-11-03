@@ -377,7 +377,10 @@ module "sensor_simulator" {
   memory              = var.java_service_size.memory
   tags                = local.tags
 
+  # Starts idle: the scenario needs the sensor IDs created by the seed, so the demo workflow injects
+  # it later (and a new revision restarts the scenario clock).
   env = merge(local.common_env, {
+    SIMULATOR_ENABLED           = "false"
     SERVER_PORT                 = "8085"
     TLS_CERTS_DIR               = "/certs"
     TELEMETRY_SERVICE_HOST      = "telemetry-service"

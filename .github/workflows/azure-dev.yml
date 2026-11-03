@@ -1,0 +1,201 @@
+name: Azure dev environment
+
+# Creates or destroys the ephemeral Azure environment. Both jobs run under the protected GitHub
+# environment "azure-dev": a required reviewer must approve the plan job, read its output, and
+# approve again before anything changes. Nothing runs on push or pull request.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "apply creates or updates the environment; destroy removes it"
+        type: choice
+        options: [apply, destroy]
+        required: true
+      image_tag:
+        description: "Image tag to deploy (sha-<commit> or vX.Y.Z). Ignored by destroy."
+        type: string
+        default: "sha-0000000"
+        required: true
+      deploy_simulator:
+        description: "Also deploy the Sensor Simulator (idle until the demo workflow starts it). Ignored by destroy."
+        type: boolean
+        default: true
+      ttl:
+        description: "Date by which the environment must be destroyed (tag), for example 2026-11-20"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# One change to the environment at a time; a running apply or destroy is never cancelled.
+concurrency:
+  group: azure-dev
+  cancel-in-progress: false
+
+env:
+  TERRAFORM_IMAGE: hashicorp/terraform:1.13
+  ACTION: ${{ inputs.action }}
+  # Public identifiers of the federated identity and the state backend (repository variables).
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_owner: ${{ vars.AZURE_OWNER }}
+  TF_VAR_ttl: ${{ inputs.ttl }}
+  TF_VAR_image_tag: ${{ inputs.image_tag }}
+  TF_VAR_deploy_simulator: ${{ inputs.deploy_simulator }}
+
+jobs:
+  guard:
+    name: Check the request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Required repository variables exist
+        env:
+          STATE_RG: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+          STATE_SA: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
+        run: |
+          for name in ARM_CLIENT_ID ARM_TENANT_ID ARM_SUBSCRIPTION_ID TF_VAR_owner STATE_RG STATE_SA; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository variable behind $name is not set. See the Azure runbook."
+              exit 1
+            fi
+          done
+
+      - name: Every image of the tag is published
+        if: inputs.action == 'apply'
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          for service in gateway asset-service telemetry-service incident-service notification-service; do
+            image="ghcr.io/${owner}/coldguard/${service}:${TF_VAR_image_tag}"
+            if ! docker manifest inspect "$image" > /dev/null 2>&1; then
+              echo "::error::$image is not pullable. Publish the release and make the packages public."
+              exit 1
+            fi
+          done
+
+  plan:
+    name: Plan (needs approval)
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: azure-dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Terraform plan
+        env:
+          STATE_RG: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+          STATE_SA: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
+        run: |
+          terraform() {
+            docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
+              -e ARM_USE_OIDC -e ARM_CLIENT_ID -e ARM_TENANT_ID -e ARM_SUBSCRIPTION_ID \
+              -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+              -e TF_VAR_owner -e TF_VAR_ttl -e TF_VAR_image_tag -e TF_VAR_deploy_simulator \
+              -v "$PWD/infra:/work" -w /work/environments/dev "$TERRAFORM_IMAGE" "$@"
+          }
+          terraform init -input=false -no-color \
+            -backend-config="resource_group_name=$STATE_RG" \
+            -backend-config="storage_account_name=$STATE_SA" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=dev.tfstate" \
+            -backend-config="use_oidc=true"
+          flag=""
+          if [ "$ACTION" = destroy ]; then flag="-destroy"; fi
+          # shellcheck disable=SC2086
+          terraform plan -input=false -no-color -lock-timeout=5m $flag | tee plan.txt
+          {
+            echo "### Plan ($ACTION)"
+            echo '```'
+            grep -E '^(Plan:|No changes|  # |Changes to Outputs)' plan.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  change:
+    name: ${{ inputs.action }} (needs approval)
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: azure-dev
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Terraform ${{ inputs.action }}
+        id: run
+        env:
+          STATE_RG: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+          STATE_SA: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
+        run: |
+          terraform() {
+            docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
+              -e ARM_USE_OIDC -e ARM_CLIENT_ID -e ARM_TENANT_ID -e ARM_SUBSCRIPTION_ID \
+              -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+              -e TF_VAR_owner -e TF_VAR_ttl -e TF_VAR_image_tag -e TF_VAR_deploy_simulator \
+              -v "$PWD/infra:/work" -w /work/environments/dev "$TERRAFORM_IMAGE" "$@"
+          }
+          terraform init -input=false -no-color \
+            -backend-config="resource_group_name=$STATE_RG" \
+            -backend-config="storage_account_name=$STATE_SA" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=dev.tfstate" \
+            -backend-config="use_oidc=true"
+          started=$(date +%s)
+          terraform "$ACTION" -input=false -no-color -auto-approve -lock-timeout=5m
+          elapsed=$(( $(date +%s) - started ))
+          echo "elapsed=$elapsed" >> "$GITHUB_OUTPUT"
+          if [ "$ACTION" = apply ]; then
+            echo "gateway_url=$(terraform output -raw gateway_url)" >> "$GITHUB_OUTPUT"
+            password=$(terraform output -raw demo_users_password)
+            echo "::add-mask::$password"
+            echo "DEMO_USERS_PASSWORD=$password" >> "$GITHUB_ENV"
+          fi
+          echo "### Terraform $ACTION finished in ${elapsed}s" >> "$GITHUB_STEP_SUMMARY"
+
+      # The apply returns when Azure has created the apps, not when the services are ready.
+      - name: Wait for the Gateway
+        if: inputs.action == 'apply'
+        env:
+          GATEWAY_URL: ${{ steps.run.outputs.gateway_url }}
+        run: |
+          deadline=$(( $(date +%s) + 900 ))
+          until code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GATEWAY_URL/api/v1/auth/login" \
+              -H 'Content-Type: application/json' -d '{}'); [ "$code" = 400 ] || [ "$code" = 401 ]; do
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::The Gateway did not answer within 15 minutes (last HTTP $code)."
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "Gateway answered HTTP $code after ${SECONDS}s of this step"
+
+      - name: Seed the demo data
+        if: inputs.action == 'apply'
+        env:
+          COLDGUARD_API_URL: ${{ steps.run.outputs.gateway_url }}
+        run: deploy/scripts/seed-demo.sh
+
+      - name: End-to-end smoke test
+        if: inputs.action == 'apply'
+        env:
+          COLDGUARD_API_URL: ${{ steps.run.outputs.gateway_url }}
+          SMOKE_SKIP_MAIL: "true"
+        run: deploy/scripts/smoke-e2e.sh | tee smoke.txt
+
+      - name: Summary
+        if: always() && inputs.action == 'apply'
+        env:
+          GATEWAY_URL: ${{ steps.run.outputs.gateway_url }}
+        run: |
+          {
+            echo "### Environment is RUNNING and costs money until it is destroyed"
+            echo "- Gateway: $GATEWAY_URL"
+            echo "- Image tag: $TF_VAR_image_tag"
+            echo "- Destroy it with this workflow (action destroy) or before $TF_VAR_ttl"
+          } >> "$GITHUB_STEP_SUMMARY"

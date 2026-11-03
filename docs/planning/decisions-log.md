@@ -872,3 +872,29 @@ certificados mTLS de desarrollo, que no se versionan.
 - La protección de la rama `master` (checks obligatorios) se configura a mano en GitHub.
 ### Trazabilidad
 APF3 Cap. 9.1; `docs/infrastructure/ci-pipeline.md`; `docs/specs/SPEC-014-pipeline-ci.md`; DEC-021.
+
+## DEC-026 — Publicación de imágenes y despliegue automatizado a Azure
+**Fecha:** 2026-11-03
+**Estado:** Aprobada
+### Contexto
+APF3 (Cap. 9.2) exige automatizar el despliegue. ADR-012 fija GHCR como registro, OIDC como
+autenticación y la aprobación humana para cada cambio en Azure; faltaba definir el versionado de
+imágenes y la forma de los workflows.
+### Decisión
+- Imágenes en GHCR (`ghcr.io/<propietario>/coldguard/<servicio>`) con etiqueta inmutable
+  `sha-<12 caracteres del commit>` y, en releases, `vX.Y.Z`. Nunca se despliega `latest`: Terraform
+  rechaza esa etiqueta.
+- Un workflow de publicación (tag `v*` o manual) exige una ejecución de CI correcta sobre el mismo
+  commit, escanea cada imagen con Trivy (falla en críticas con parche disponible; exenciones en un
+  archivo documentado) y publica las seis imágenes.
+- Un solo workflow manual de Azure ejecuta `apply` o `destroy` de Terraform con dos trabajos, ambos
+  bajo el *environment* protegido `azure-dev`: el primero muestra el `plan` y el segundo cambia la
+  infraestructura. Cada trabajo exige la aprobación de un revisor. Tras un `apply` espera al Gateway,
+  siembra los datos de demostración y ejecuta el smoke de extremo a extremo.
+- La identidad federada solo acepta el subject del *environment*; los pull requests no tienen
+  credenciales de Azure y solo ejecutan `fmt` y `validate`.
+- El rollback es un nuevo `apply` con la etiqueta anterior (Terraform crea una revisión nueva); no hay
+  rollback automático.
+- El smoke contra Azure omite los correos porque Mailpit solo expone SMTP allí.
+### Trazabilidad
+APF3 Cap. 9.2; ADR-012; `docs/infrastructure/cd-pipeline.md`; `docs/specs/SPEC-015-automatizacion-despliegues.md`; DEC-025.
