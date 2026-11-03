@@ -1,5 +1,13 @@
 # SPEC-016 — Infraestructura Azure con Terraform (APF3 · soporte de 9.2 y "Despliegue versión final")
 
+## Estado (2026-11-03)
+
+Código escrito y validado (`fmt`, `init -backend=false`, `validate`, gitleaks, job de CI
+"Terraform validate"); **no aprovisionado**. Estructura según ADR-012: capa `foundation`, entorno
+`dev` efímero y seis módulos (`observability`, `keyvault`, `postgres`, `containerapps-env`,
+`container-app`, `pki`); GHCR en lugar de ACR. Pendientes humanos: registrar proveedores, `plan` y
+`apply` con aprobación.
+
 ## Objetivo
 
 Diseñar, escribir y validar la infraestructura de Azure como código (módulos Terraform), dejarla

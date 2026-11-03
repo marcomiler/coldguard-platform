@@ -1,0 +1,6 @@
+# Copy to backend.hcl (git-ignored) with the foundation outputs, then:
+#   terraform init -backend-config=backend.hcl
+resource_group_name  = "rg-coldguard-foundation"
+storage_account_name = "<state_storage_account_name output>"
+container_name       = "tfstate"
+key                  = "dev.tfstate"
