@@ -27,6 +27,7 @@ El MVP usa RabbitMQ, ejecutado localmente vía Docker Compose (`docs/operations/
 - ADR-003 (gRPC reservado para comunicación síncrona; RabbitMQ cubre la asíncrona).
 - ADR-005 (Incident Service → Notification Service vía eventos en RabbitMQ).
 - ADR-009 (Transactional Outbox para publicación confiable sobre RabbitMQ).
+- ADR-012 (RabbitMQ se despliega como contenedor mínimo en Azure Container Apps, sin disco persistente).
 
 ## Evolución futura a Azure
 **Confirmado**: Azure es el proveedor cloud objetivo para el despliegue planificado; el
