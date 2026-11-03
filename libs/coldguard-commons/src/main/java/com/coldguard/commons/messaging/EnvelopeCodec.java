@@ -1,6 +1,6 @@
 package com.coldguard.commons.messaging;
 
-import com.coldguard.commons.messaging.error.PermanentMessageException;
+import   com.coldguard.commons.messaging.error.PermanentMessageException;
 import java.util.Map;
 import java.util.Set;
 import tools.jackson.core.JacksonException;
