@@ -120,11 +120,11 @@ retroactivo); la última es el cambio de la prueba de reversión.
 
 | ID | Fecha | Tipo | Descripción | Riesgo | Aprobación | Evidencia | Resultado |
 |---|---|---|---|---|---|---|---|
-| CHG-001 | 2026-10-02 | Normal | Publicación confiable de eventos con Transactional Outbox, con migración de base de datos | Alto | Equipo de desarrollo, tras la decisión de arquitectura correspondiente | Commit `a77977e` | Integrado |
-| CHG-002 | 2026-10-02 | Normal | Contratos gRPC versionados y esquema del evento de umbral superado | Medio | Revisión y fusión de la solicitud de integración n.º 35 | Solicitud de integración n.º 35, commits `90ebbfa` y `2a6888e` | Integrado |
-| CHG-003 | 2026-10-05 | Normal | Autenticación del actor en los servicios internos con identidad propagada por el Gateway | Alto | Equipo de desarrollo, tras la decisión de seguridad correspondiente | Commit `9960a13` | Integrado |
-| CHG-004 | 2026-10-07 | Estándar | Tableros de Grafana aprovisionados como código | Bajo | Equipo de desarrollo | Commit `eaed966` | Integrado |
-| CHG-005 | 2026-10-05 | Estándar | Corrección de un defecto: cerrar un incidente con un identificador que no es un UUID debe responder 404 | Bajo | Equipo de desarrollo | Commit `2f94a71` | Integrado |
+| CHG-001 | 2026-10-02 | Normal | Publicación confiable de eventos con Transactional Outbox, con migración de base de datos | Alto | Equipo de desarrollo, tras la decisión de arquitectura correspondiente | Commit `fb8d8f9` | Integrado |
+| CHG-002 | 2026-10-02 | Normal | Contratos gRPC versionados y esquema del evento de umbral superado | Medio | Revisión y fusión de la solicitud de integración n.º 35 | Solicitud de integración n.º 35, commits `b0fb76c` y `45332bf` | Integrado |
+| CHG-003 | 2026-10-05 | Normal | Autenticación del actor en los servicios internos con identidad propagada por el Gateway | Alto | Equipo de desarrollo, tras la decisión de seguridad correspondiente | Commit `fec4558` | Integrado |
+| CHG-004 | 2026-10-07 | Estándar | Tableros de Grafana aprovisionados como código | Bajo | Equipo de desarrollo | Commit `3c3f3b4` | Integrado |
+| CHG-005 | 2026-10-05 | Estándar | Corrección de un defecto: cerrar un incidente con un identificador que no es un UUID debe responder 404 | Bajo | Equipo de desarrollo | Commit `93dba01` | Integrado |
 | CHG-006 | 2026-11-02 | Estándar | Prueba controlada de reversión del Gateway en el stack local (sección 6) | Bajo | Equipo de desarrollo | Tabla de la sección 6 | Cambio revertido; comportamiento restablecido |
 
 ## 8. Métricas del proceso
