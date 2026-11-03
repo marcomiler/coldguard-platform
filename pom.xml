@@ -24,6 +24,9 @@
     <!-- Resolved empirically via `mvn dependency:tree` against the spring-grpc-dependencies BOM
          below; kept in sync with it so the protoc/protoc-gen-grpc-java build-time plugins match
          the runtime library versions. -->
+    <!-- Overrides the Tomcat managed by Spring Boot 4.1.1 (11.0.24): 11.0.25 fixes four critical
+         CVEs reported by the image scan. Drop it once the Spring Boot BOM ships 11.0.25 or later. -->
+    <tomcat.version>11.0.25</tomcat.version>
     <spring-grpc.version>1.0.3</spring-grpc.version>
     <grpc.version>1.77.1</grpc.version>
     <protobuf.version>4.33.4</protobuf.version>
