@@ -6,3 +6,6 @@ useDefault = true
 description = "Documented false positives"
 # LogSecretsTest declares a fake password on purpose: it asserts the value never reaches the logs.
 paths = ['''apps/gateway/src/test/java/com/coldguard/gateway/config/LogSecretsTest\.java''']
+# Terraform maps environment variables to the *name* of a Key Vault secret (DB_PASSWORD = "db-password");
+# the name is not a credential. Only these three fixed names are allowed.
+regexes = ['''^"(db|rabbitmq|demo)-password"$''']
