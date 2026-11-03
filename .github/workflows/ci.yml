@@ -208,10 +208,13 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      # Compose refuses to start without the demo users' password. It is generated for this run only,
+      # lives in the job environment (never in the repository) and is shared by every step below.
+      - name: Generate a throwaway demo password
+        run: echo "DEMO_USERS_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)" >> "$GITHUB_ENV"
+
       - name: Validate the Compose file
-        run: |
-          cp deploy/local/.env.example deploy/local/.env
-          docker compose -f deploy/local/docker-compose.yml config -q
+        run: docker compose -f deploy/local/docker-compose.yml config -q
 
       - name: Start the stack (up.sh creates the certificates)
         run: deploy/scripts/up.sh
@@ -236,4 +239,4 @@ jobs:
 
       - name: Stop the stack
         if: always()
-        run: docker compose -f deploy/local/docker-compose.yml down -v
+        run: deploy/scripts/down.sh --purge --yes
