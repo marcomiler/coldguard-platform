@@ -1,5 +1,14 @@
 # SPEC-015 — Automatización de despliegues, CD (APF3 · Cap. 9.2)
 
+## Estado (2026-11-03)
+
+Escrito y verificado con `actionlint`; **no ejecutado contra Azure**. Según ADR-012 y DEC-026: GHCR
+en lugar de ACR; `release-images.yml` (compuerta de CI, Trivy, publicación con `sha-<commit>` y
+`vX.Y.Z`); `azure-dev.yml` reemplaza a `infra-plan.yml` y `deploy-azure.yml` (acción `apply` o
+`destroy`, trabajos `plan` y `change` bajo el *environment* `azure-dev`, con smoke posterior). Sin
+rollback automático: el rollback es un `apply` con la etiqueta anterior. Documentos:
+`cd-pipeline.md` y `deployment-checklist.md`.
+
 ## Objetivo
 
 Automatizar con GitHub Actions la publicación de imágenes y el despliegue hacia Azure Container Apps

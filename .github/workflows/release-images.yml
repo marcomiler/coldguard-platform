@@ -1,0 +1,108 @@
+name: Release images
+
+# Publishes the six service images to GitHub Container Registry. CI never publishes; this is the only
+# place that does, and only for a commit whose CI run succeeded.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TRIVY_IMAGE: aquasec/trivy:0.58.0
+
+jobs:
+  gate:
+    name: CI passed on this commit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Require a successful CI run for the commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" \
+            --status success --json databaseId --jq length)
+          if [ "$runs" -lt 1 ]; then
+            echo "::error::No successful CI run for $GITHUB_SHA. Merge through a pull request first."
+            exit 1
+          fi
+
+  publish:
+    name: Publish ${{ matrix.service }}
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: gateway
+            dockerfile: apps/gateway/Dockerfile
+          - service: asset-service
+            dockerfile: apps/asset-service/Dockerfile
+          - service: telemetry-service
+            dockerfile: apps/telemetry-service/Dockerfile
+          - service: incident-service
+            dockerfile: apps/incident-service/Dockerfile
+          - service: notification-service
+            dockerfile: apps/notification-service/Dockerfile
+          - service: sensor-simulator
+            dockerfile: simulator/sensor-simulator/Dockerfile
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Work out the image name and tags
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          {
+            echo "IMAGE=ghcr.io/${owner}/coldguard/${SERVICE}"
+            echo "SHA_TAG=sha-${GITHUB_SHA:0:12}"
+          } >> "$GITHUB_ENV"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "VERSION_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build the image
+        run: >-
+          docker build -f "${{ matrix.dockerfile }}" -t "$IMAGE:$SHA_TAG"
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+          .
+
+      # Critical vulnerabilities with an available fix stop the release; exemptions live in .trivyignore.
+      - name: Scan the image (Trivy)
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          -v "$PWD/.trivyignore:/.trivyignore:ro"
+          "$TRIVY_IMAGE" image --severity CRITICAL --ignore-unfixed --exit-code 1 --no-progress
+          --ignorefile /.trivyignore "$IMAGE:$SHA_TAG"
+
+      - name: Log in to GHCR
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Push the immutable tags
+        run: |
+          docker push "$IMAGE:$SHA_TAG"
+          if [ -n "${VERSION_TAG:-}" ]; then
+            docker tag "$IMAGE:$SHA_TAG" "$IMAGE:$VERSION_TAG"
+            docker push "$IMAGE:$VERSION_TAG"
+          fi
+          {
+            echo "### ${{ matrix.service }}"
+            echo "- \`$IMAGE:$SHA_TAG\`"
+            if [ -n "${VERSION_TAG:-}" ]; then echo "- \`$IMAGE:$VERSION_TAG\`"; fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -17,3 +17,9 @@ output "container_apps_domain" {
   description = "Default domain of the Container Apps environment."
   value       = module.environment.default_domain
 }
+
+output "demo_users_password" {
+  description = "Password of the demo users, read by the post-deployment smoke test."
+  value       = random_password.demo_users.result
+  sensitive   = true
+}

@@ -1,0 +1,100 @@
+name: Azure demo simulator
+
+# Starts or stops the Sensor Simulator in the running Azure environment. Starting seeds the demo data,
+# builds the demo timeline from the sensor IDs and gives it to the simulator; the new revision starts
+# the scenario clock at zero, so run it when the demonstration begins. Needs an environment created
+# with the simulator enabled. Runs under the protected environment "azure-dev" (reviewer approval).
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "start (re)starts the demo timeline; stop silences the simulator"
+        type: choice
+        options: [start, stop]
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-dev
+  cancel-in-progress: false
+
+env:
+  TERRAFORM_IMAGE: hashicorp/terraform:1.13
+  RESOURCE_GROUP: rg-coldguard-dev
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  ACTION: ${{ inputs.action }}
+
+jobs:
+  simulator:
+    name: ${{ inputs.action }} the simulator
+    runs-on: ubuntu-latest
+    environment: azure-dev
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Sign in to Azure (OIDC)
+        run: |
+          token=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+          echo "::add-mask::$token"
+          az login --service-principal -u "$ARM_CLIENT_ID" -t "$ARM_TENANT_ID" \
+            --federated-token "$token" --allow-no-subscriptions > /dev/null
+          az account set --subscription "$ARM_SUBSCRIPTION_ID"
+          az config set extension.use_dynamic_install=yes_without_prompt extension.dynamic_install_allow_preview=true > /dev/null
+
+      - name: Stop the simulator
+        if: inputs.action == 'stop'
+        run: |
+          az containerapp update -g "$RESOURCE_GROUP" -n sensor-simulator \
+            --set-env-vars 'SPRING_APPLICATION_JSON={"coldguard":{"simulator":{"enabled":false}}}' > /dev/null
+          echo "### Simulator stopped" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Read the environment outputs
+        if: inputs.action == 'start'
+        env:
+          STATE_RG: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+          STATE_SA: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
+        run: |
+          terraform() {
+            docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
+              -e ARM_USE_OIDC -e ARM_CLIENT_ID -e ARM_TENANT_ID -e ARM_SUBSCRIPTION_ID \
+              -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+              -v "$PWD/infra:/work" -w /work/environments/dev "$TERRAFORM_IMAGE" "$@"
+          }
+          terraform init -input=false -no-color \
+            -backend-config="resource_group_name=$STATE_RG" \
+            -backend-config="storage_account_name=$STATE_SA" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=dev.tfstate" \
+            -backend-config="use_oidc=true" > /dev/null
+          password=$(terraform output -raw demo_users_password)
+          echo "::add-mask::$password"
+          {
+            echo "DEMO_USERS_PASSWORD=$password"
+            echo "COLDGUARD_API_URL=$(terraform output -raw gateway_url)"
+          } >> "$GITHUB_ENV"
+
+      - name: Seed the demo data (idempotent)
+        if: inputs.action == 'start'
+        run: deploy/scripts/seed-demo.sh
+
+      - name: Start the demo timeline
+        if: inputs.action == 'start'
+        run: |
+          deploy/scripts/generate-simulator-scenario.sh --demo
+          json=$(yq -o=json -I=0 '.' deploy/local/simulator/scenario.yml)
+          az containerapp update -g "$RESOURCE_GROUP" -n sensor-simulator \
+            --set-env-vars "SPRING_APPLICATION_JSON=$json" > /dev/null
+          {
+            echo "### Demo timeline started"
+            echo "Incidents appear within about 4 minutes. Use the Gateway at: $COLDGUARD_API_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
