@@ -102,8 +102,12 @@ jobs:
       - name: Build and test
         run: mvn -B -ntp verify
 
+      # `verify` already ran every unit test; this runs only the tests tagged "integration" (they need
+      # the PostgreSQL service above) instead of repeating the whole module and its dependencies.
       - name: Integration tests (incident-service, PostgreSQL)
-        run: mvn -B -ntp -pl apps/incident-service -am test -DexcludedGroups=
+        run: >-
+          mvn -B -ntp -pl apps/incident-service -am test
+          -Dgroups=integration -DexcludedGroups= -Dsurefire.failIfNoSpecifiedTests=false
 
       - name: Test summary
         if: always()
