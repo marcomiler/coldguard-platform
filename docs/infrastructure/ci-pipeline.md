@@ -105,6 +105,25 @@ Los diez trabajos que corresponden a una solicitud de integración terminaron en
 | Imagen sensor-simulator | Correcto | 45 s |
 | Smoke con Compose | Omitido a propósito: solo corre al integrar a la rama principal o bajo demanda | — |
 
+### Ejecución sobre la rama principal, con el smoke completo
+
+Tras integrar la solicitud n.º 88 a la rama principal, el pipeline completo se ejecutó el 3 de
+noviembre de 2026 (ejecución 41554240614,
+<https://github.com/marcomiler/coldguard-platform/actions/runs/41554240614>) y los once trabajos
+terminaron en verde, incluido el recorrido de extremo a extremo en un runner limpio de GitHub:
+
+| Trabajo | Resultado | Duración |
+|---|---|---|
+| Formato y lint | Correcto | 25 s |
+| Escaneo de secretos | Correcto | 9 s |
+| Construcción y pruebas | Correcto | 8 min 3 s |
+| Análisis estático (SpotBugs) | Correcto | 1 min 56 s |
+| Imágenes (seis) | Correcto | 43 s a 1 min 3 s |
+| **Smoke con Compose** | **Correcto** | **2 min 55 s** |
+
+El smoke generó una contraseña temporal para los usuarios de demostración, levantó la plataforma desde
+cero, sembró los datos, superó las 13 comprobaciones y destruyó el stack con sus volúmenes.
+
 ### Pruebas de que los controles detienen un cambio defectuoso
 
 Se introdujeron fallos a propósito y se comprobó que cada control los detecta:
@@ -117,8 +136,8 @@ Se introdujeron fallos a propósito y se comprobó que cada control los detecta:
 
 ### Defectos reales que el pipeline destapó y se corrigieron
 
-La verificación sobre una copia limpia encontró cuatro problemas que no se veían en la máquina de
-desarrollo:
+La verificación sobre una copia limpia y las primeras ejecuciones en GitHub encontraron seis problemas
+que no se veían en la máquina de desarrollo:
 
 1. **La integración continua anterior fallaba en un checkout limpio.** Las pruebas del Gateway abren
    canales mTLS con certificados de desarrollo que no se versionan; en una máquina limpia 50 pruebas
@@ -132,11 +151,26 @@ desarrollo:
 4. **Ruido de análisis estático.** SpotBugs reportaba cientos de hallazgos (177 en un solo módulo), casi todos en clases generadas por
    protoc y en la inyección por constructor de Spring. Tras las exclusiones documentadas, quedan 0 sin
    haber ocultado código escrito a mano.
+5. **El smoke fallaba en el primer intento en GitHub.** El flujo copiaba el archivo de ejemplo de
+   variables, cuyos valores están vacíos, y Compose exige la contraseña de los usuarios de demostración.
+   Se corrigió generándola al vuelo en el entorno del trabajo (nunca en el repositorio) y deteniendo el
+   stack con el script del proyecto.
+6. **Una prueba de mensajería intermitente.** Una ejecución sobre la rama principal falló porque una
+   prueba de integración de RabbitMQ esperaba exactamente un efecto y contó dos. No se reprodujo en seis
+   ejecuciones locales seguidas ni en otras cuatro de GitHub. El paso que la repetía se acotó a las
+   pruebas etiquetadas como de integración (10 pruebas en 12 s en lugar de 168 en 193 s), y la
+   estabilización de la propia prueba queda registrada como cambio aparte.
 
-## 6. Límites
+## 6. Protección de la rama principal y límites
 
-- La protección de la rama principal (exigir que estos controles pasen antes de integrar) se configura
-  manualmente en GitHub, porque requiere permisos de administración del repositorio.
+La rama principal está protegida con un conjunto de reglas de GitHub activo y sin excepciones: no se
+puede borrar ni forzar, todo cambio entra por solicitud de integración y deben pasar los diez controles
+descritos (formato y lint, secretos, construcción y pruebas, análisis estático y las seis imágenes). No
+se exigen aprobaciones de otra persona porque el equipo es pequeño y GitHub no permite aprobar la propia
+solicitud; el control lo hacen los diez controles automáticos.
+
 - El smoke con Compose solo corre en la rama principal y bajo demanda, porque construye las seis
-  imágenes y levanta toda la plataforma.
+  imágenes y levanta toda la plataforma; por eso no es un control obligatorio de la solicitud.
 - Las imágenes no se publican desde CI; su publicación forma parte del flujo de despliegue.
+- Una prueba de integración de mensajería es intermitente en runners cargados (sección 5); está
+  identificada y su estabilización se tramita como cambio aparte.
