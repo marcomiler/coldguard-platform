@@ -119,17 +119,18 @@ module "environment" {
 }
 
 # --- Applications ----------------------------------------------------------------------------
-# Key Vault secret IDs by the name the app sees. Dots are allowed in app secret names, and the
-# services expect files such as gateway.crt, so the file name is the secret name.
+# Key Vault secret IDs by the name the app sees. App secret names allow only lower case letters,
+# digits and "-", and the mounted file is named after the secret, so the files are gateway-crt,
+# gateway-key and ca-crt; the services learn the extension from TLS_CERT_EXT and TLS_KEY_EXT.
 
 locals {
   kv = module.keyvault.secret_ids
 
   mtls_secrets = {
     for name in concat(tolist(local.server_identities), tolist(local.client_identities)) : name => {
-      "${name}.crt" = local.kv["${name}-crt"]
-      "${name}.key" = local.kv["${name}-key"]
-      "ca.crt"      = local.kv["ca-crt"]
+      "${name}-crt" = local.kv["${name}-crt"]
+      "${name}-key" = local.kv["${name}-key"]
+      "ca-crt"      = local.kv["ca-crt"]
     }
   }
 
@@ -208,6 +209,8 @@ module "asset_service" {
   env = merge(local.common_env, local.database_env, local.amqp_env, {
     GRPC_SERVER_PORT                   = tostring(local.grpc_services["asset-service"].grpc_port)
     TLS_CERTS_DIR                      = "/certs"
+    TLS_CERT_EXT                       = "-crt"
+    TLS_KEY_EXT                        = "-key"
     ASSET_CALIBRATION_DEFAULT_VALIDITY = "P90D"
   })
   secrets = merge(local.mtls_secrets["asset-service"], {
@@ -241,6 +244,8 @@ module "telemetry_service" {
   env = merge(local.common_env, local.database_env, local.amqp_env, {
     GRPC_SERVER_PORT        = tostring(local.grpc_services["telemetry-service"].grpc_port)
     TLS_CERTS_DIR           = "/certs"
+    TLS_CERT_EXT            = "-crt"
+    TLS_KEY_EXT             = "-key"
     ASSET_SERVICE_HOST      = "asset-service"
     ASSET_SERVICE_GRPC_PORT = tostring(local.grpc_services["asset-service"].grpc_port)
   })
@@ -275,6 +280,8 @@ module "incident_service" {
   env = merge(local.common_env, local.database_env, local.amqp_env, {
     GRPC_SERVER_PORT           = tostring(local.grpc_services["incident-service"].grpc_port)
     TLS_CERTS_DIR              = "/certs"
+    TLS_CERT_EXT               = "-crt"
+    TLS_KEY_EXT                = "-key"
     IDENTITY_BOOTSTRAP_ENABLED = "true"
   })
   secrets = merge(local.mtls_secrets["incident-service"], {
@@ -341,8 +348,10 @@ module "gateway" {
     SERVER_PORT                           = "8080"
     MANAGEMENT_PORT                       = "8090"
     TLS_CERTS_DIR                         = "/certs"
-    JWT_PRIVATE_KEY_PATH                  = "/jwt/jwt-private.pem"
-    JWT_PUBLIC_KEY_PATH                   = "/jwt/jwt-public.pem"
+    TLS_CERT_EXT                          = "-crt"
+    TLS_KEY_EXT                           = "-key"
+    JWT_PRIVATE_KEY_PATH                  = "/jwt/jwt-private-pem"
+    JWT_PUBLIC_KEY_PATH                   = "/jwt/jwt-public-pem"
     INCIDENT_SERVICE_HOST                 = "incident-service"
     INCIDENT_SERVICE_GRPC_PORT            = tostring(local.grpc_services["incident-service"].grpc_port)
     ASSET_SERVICE_HOST                    = "asset-service"
@@ -353,8 +362,8 @@ module "gateway" {
     COLDGUARD_TECHNICAL_ENDPOINTS_ENABLED = tostring(var.technical_endpoints_enabled)
   })
   secrets = merge(local.mtls_secrets["gateway"], {
-    "jwt-private.pem" = local.kv["jwt-private-pem"]
-    "jwt-public.pem"  = local.kv["jwt-public-pem"]
+    "jwt-private-pem" = local.kv["jwt-private-pem"]
+    "jwt-public-pem"  = local.kv["jwt-public-pem"]
   })
   secret_mount_paths = ["/certs/gateway", "/certs/ca", "/jwt"]
 
@@ -383,6 +392,8 @@ module "sensor_simulator" {
     SIMULATOR_ENABLED           = "false"
     SERVER_PORT                 = "8085"
     TLS_CERTS_DIR               = "/certs"
+    TLS_CERT_EXT                = "-crt"
+    TLS_KEY_EXT                 = "-key"
     TELEMETRY_SERVICE_HOST      = "telemetry-service"
     TELEMETRY_SERVICE_GRPC_PORT = tostring(local.grpc_services["telemetry-service"].grpc_port)
   })

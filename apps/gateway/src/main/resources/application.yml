@@ -38,10 +38,10 @@ spring:
       pem:
         gateway-client:
           keystore:
-            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/gateway/gateway.crt
-            private-key: file:${TLS_CERTS_DIR:../../deploy/local/certs}/gateway/gateway.key
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/gateway/gateway${TLS_CERT_EXT:.crt}
+            private-key: file:${TLS_CERTS_DIR:../../deploy/local/certs}/gateway/gateway${TLS_KEY_EXT:.key}
           truststore:
-            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/ca/ca.crt
+            certificate: file:${TLS_CERTS_DIR:../../deploy/local/certs}/ca/ca${TLS_CERT_EXT:.crt}
 
 coldguard:
   gateway:
