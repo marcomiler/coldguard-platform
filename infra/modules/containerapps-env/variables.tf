@@ -13,9 +13,15 @@ variable "resource_group_name" {
   type        = string
 }
 
-variable "log_analytics_workspace_id" {
-  description = "Workspace that receives the container logs."
+variable "log_analytics_customer_id" {
+  description = "Customer (workspace) ID of the Log Analytics workspace that receives the container logs."
   type        = string
+}
+
+variable "log_analytics_shared_key" {
+  description = "Primary shared key of that workspace."
+  type        = string
+  sensitive   = true
 }
 
 variable "tags" {

@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = ">= 4.30, < 5.0"
     }
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.4"
+    }
     random = {
       source  = "hashicorp/random"
       version = "~> 3.6"
@@ -24,6 +28,8 @@ terraform {
 }
 
 # The subscription comes from the environment (ARM_SUBSCRIPTION_ID), never from the code.
+provider "azapi" {}
+
 provider "azurerm" {
   features {
     key_vault {
