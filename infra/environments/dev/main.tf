@@ -111,11 +111,12 @@ module "postgres" {
 module "environment" {
   source = "../../modules/containerapps-env"
 
-  name                       = "cae-${local.prefix}"
-  location                   = var.location
-  resource_group_name        = var.resource_group_name
-  log_analytics_workspace_id = module.observability.workspace_id
-  tags                       = local.tags
+  name                      = "cae-${local.prefix}"
+  location                  = var.location
+  resource_group_name       = var.resource_group_name
+  log_analytics_customer_id = module.observability.workspace_customer_id
+  log_analytics_shared_key  = module.observability.primary_shared_key
+  tags                      = local.tags
 }
 
 # --- Applications ----------------------------------------------------------------------------
