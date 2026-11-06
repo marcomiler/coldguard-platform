@@ -81,7 +81,7 @@ resource "azurerm_federated_identity_credential" "github_environment" {
   parent_id           = azurerm_user_assigned_identity.github.id
   audience            = ["api://AzureADTokenExchange"]
   issuer              = "https://token.actions.githubusercontent.com"
-  subject             = "repo:${var.github_repository}:environment:${var.github_environment}"
+  subject             = "repo:${coalesce(var.github_oidc_repository, var.github_repository)}:environment:${var.github_environment}"
 }
 
 resource "azurerm_role_assignment" "github_dev_contributor" {
