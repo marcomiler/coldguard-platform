@@ -59,13 +59,36 @@ terraform apply dev.tfplan                     # approval required
 terraform destroy                              # approval required; do not leave it running
 ```
 
-The demo users' password is generated; read it from Key Vault (`demo-password`) with the Key Vault
-name in the outputs.
+The demo users' password is generated. Key Vault grants no access to people (only to the apps and the
+deployer), so read it from the state, from `infra/environments/dev`:
+`terraform output -raw demo_users_password`.
 
-## Known unverified points (checked at the first plan/apply)
+The frontend is a separate step: after the apply, run the workflow "Azure frontend". It builds the
+frontend repository against the Gateway of the running environment and publishes it to the static
+site that the apply created (`frontend_url` output). The same apply adds the site origin to the
+Gateway's CORS list.
+
+## Verified at the first apply, and traps found
+
+Verified (the end-to-end smoke test passed against the real environment):
 
 - Internal gRPC with application-level mTLS over Container Apps TCP ingress, using the app name as
-  host (the certificate SANs match the names).
+  host.
 - One secret volume mounted at several folders of the same container.
-- PostgreSQL Flexible Server availability of the Burstable SKU in the chosen region.
-- The Docker Hub RabbitMQ image can be rate limited when pulled from Azure.
+- The Burstable PostgreSQL SKU in `canadacentral`, and the RabbitMQ image pulled from Docker Hub.
+
+Traps (already handled in the code, listed so they are not rediscovered):
+
+- A Container Apps environment created without an explicit mode is now an *express* environment, which
+  rejects TCP ingress and Key Vault secret references. `azurerm` cannot choose the mode, so the
+  environment is created with `azapi` in `WorkloadProfiles` mode.
+- App secret names allow only lower case letters, digits and `-`. Mounted secrets are files named
+  after the secret, so the services read the extension from `TLS_CERT_EXT` and `TLS_KEY_EXT`.
+- The pipeline identity cannot purge a soft-deleted Key Vault; the provider does not try to.
+- GitHub may issue OIDC subjects that carry the owner and repository IDs; the federated credential
+  accepts that form through `github_oidc_repository`.
+- After five wrong passwords an account is locked for 15 minutes and the answer is the same
+  `INVALID_CREDENTIALS`.
+
+Not verified yet: the static site serves its entry point publicly with the account settings used, and
+the Burstable SKU and Docker Hub limits at other times of day.

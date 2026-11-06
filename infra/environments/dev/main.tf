@@ -119,6 +119,26 @@ module "environment" {
   tags                      = local.tags
 }
 
+# --- Frontend --------------------------------------------------------------------------------
+# Hosting for the single-page application; the content is published by the frontend workflow.
+
+resource "random_string" "frontend" {
+  count   = var.deploy_frontend ? 1 : 0
+  length  = 6
+  upper   = false
+  special = false
+}
+
+module "frontend" {
+  count  = var.deploy_frontend ? 1 : 0
+  source = "../../modules/static-site"
+
+  name                = "stcgfe${random_string.frontend[0].result}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tags                = local.tags
+}
+
 # --- Applications ----------------------------------------------------------------------------
 # Key Vault secret IDs by the name the app sees. App secret names allow only lower case letters,
 # digits and "-", and the mounted file is named after the secret, so the files are gateway-crt,
@@ -359,7 +379,7 @@ module "gateway" {
     ASSET_SERVICE_GRPC_PORT               = tostring(local.grpc_services["asset-service"].grpc_port)
     TELEMETRY_SERVICE_HOST                = "telemetry-service"
     TELEMETRY_SERVICE_GRPC_PORT           = tostring(local.grpc_services["telemetry-service"].grpc_port)
-    COLDGUARD_CORS_ALLOWED_ORIGINS        = var.cors_allowed_origins
+    COLDGUARD_CORS_ALLOWED_ORIGINS        = join(",", compact(concat([var.cors_allowed_origins], module.frontend[*].url)))
     COLDGUARD_TECHNICAL_ENDPOINTS_ENABLED = tostring(var.technical_endpoints_enabled)
   })
   secrets = merge(local.mtls_secrets["gateway"], {

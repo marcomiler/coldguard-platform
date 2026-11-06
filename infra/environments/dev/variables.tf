@@ -72,6 +72,12 @@ variable "deploy_mailpit" {
   default     = true
 }
 
+variable "deploy_frontend" {
+  description = "Create the static site that serves the frontend. The Gateway then accepts its origin through CORS."
+  type        = bool
+  default     = true
+}
+
 variable "deploy_simulator" {
   description = "Deploy the sensor simulator. It needs a scenario file that this layer does not provide, so it is off by default."
   type        = bool

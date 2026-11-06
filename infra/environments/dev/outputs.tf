@@ -3,6 +3,16 @@ output "gateway_url" {
   value       = "https://${module.gateway.fqdn}"
 }
 
+output "frontend_url" {
+  description = "Public HTTPS URL of the frontend (empty when deploy_frontend is false)."
+  value       = join("", module.frontend[*].url)
+}
+
+output "frontend_storage_account" {
+  description = "Storage account that serves the frontend."
+  value       = join("", module.frontend[*].name)
+}
+
 output "key_vault_name" {
   description = "Key Vault that holds the generated secrets (for example demo-password)."
   value       = module.keyvault.name

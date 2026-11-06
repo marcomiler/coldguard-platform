@@ -66,6 +66,33 @@ infraestructura. Un tercer flujo manual, también bajo el *environment* `azure-d
   aparecen en unos 4 minutos.
 - **Detener:** apaga el simulador sin destruir el entorno.
 
+### Publicación del frontend
+
+Un tercer flujo, también manual y bajo el mismo *environment* protegido, publica el frontend en el
+sitio estático que crea el entorno (cuenta de Storage con la función de sitio web, en la misma región
+que el backend).
+
+```mermaid
+flowchart LR
+  A[Apply del entorno<br/>crea el sitio y la política CORS] --> B[Publicación del frontend]
+  B --> C[Lee la dirección del Gateway en Azure]
+  C --> D[Compila el frontend con esa dirección]
+  D --> E[Sustituye el contenido del sitio]
+  E --> F[Verifica sitio, ruta profunda y CORS]
+```
+
+- **Orden:** primero el apply del entorno, que crea el sitio y añade su origen a la política CORS del
+  Gateway; después la publicación. Publicar otra vez no toca la infraestructura, y recrear el entorno
+  obliga a publicar de nuevo porque cambia la dirección del Gateway.
+- **Compilación:** se hace en este flujo y no en el del frontend, porque la dirección del Gateway se
+  fija al compilar. El análisis de código y las pruebas del frontend siguen en su propio pipeline.
+- **Clave de la cuenta:** se lee de Azure en el momento de publicar, se enmascara y no se guarda.
+- **Verificación:** la página responde, una ruta profunda devuelve la aplicación y el Gateway acepta el
+  origen del sitio en una solicitud de verificación previa (CORS).
+- **Limitaciones:** sin dominio propio, sin CDN y sin cabeceras de seguridad propias; las rutas
+  profundas responden con estado 404 aunque entreguen la aplicación (decisión de costo y región,
+  ADR-013).
+
 ## 3. Versionado y rollback
 
 | Concepto | Regla |

@@ -152,6 +152,7 @@ jobs:
           echo "elapsed=$elapsed" >> "$GITHUB_OUTPUT"
           if [ "$ACTION" = apply ]; then
             echo "gateway_url=$(terraform output -raw gateway_url)" >> "$GITHUB_OUTPUT"
+            echo "frontend_url=$(terraform output -raw frontend_url)" >> "$GITHUB_OUTPUT"
             password=$(terraform output -raw demo_users_password)
             echo "::add-mask::$password"
             echo "DEMO_USERS_PASSWORD=$password" >> "$GITHUB_ENV"
@@ -192,10 +193,12 @@ jobs:
         if: always() && inputs.action == 'apply'
         env:
           GATEWAY_URL: ${{ steps.run.outputs.gateway_url }}
+          FRONTEND_URL: ${{ steps.run.outputs.frontend_url }}
         run: |
           {
             echo "### Environment is RUNNING and costs money until it is destroyed"
             echo "- Gateway: $GATEWAY_URL"
+            [ -z "$FRONTEND_URL" ] || echo "- Frontend site (publish it with the workflow Azure frontend): $FRONTEND_URL"
             echo "- Image tag: $TF_VAR_image_tag"
             echo "- Destroy it with this workflow (action destroy) or before $TF_VAR_ttl"
           } >> "$GITHUB_STEP_SUMMARY"

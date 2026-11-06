@@ -1,0 +1,135 @@
+name: Azure frontend
+
+# Builds the frontend against the running environment's Gateway and publishes it to the static site
+# created by the "Azure dev environment" workflow. Run it after an apply that created the environment
+# with deploy_frontend enabled (the default); run it again whenever the frontend or the Gateway URL
+# changes. Runs under the protected environment "azure-dev" (reviewer approval).
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_ref:
+        description: "Branch, tag or commit of the frontend repository to publish"
+        type: string
+        default: master
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-dev
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: rg-coldguard-dev
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  publish:
+    name: Build and publish the frontend
+    runs-on: ubuntu-latest
+    environment: azure-dev
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # The frontend repository is public, so no token is needed to read it.
+      - name: Check out the frontend
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ github.repository_owner }}/coldguard-frontend
+          ref: ${{ inputs.frontend_ref }}
+          path: frontend
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+
+      - name: Sign in to Azure (OIDC)
+        run: |
+          token=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+          echo "::add-mask::$token"
+          az login --service-principal -u "$ARM_CLIENT_ID" -t "$ARM_TENANT_ID" \
+            --federated-token "$token" --allow-no-subscriptions > /dev/null
+          az account set --subscription "$ARM_SUBSCRIPTION_ID"
+
+      - name: Find the Gateway and the static site
+        id: env
+        run: |
+          gateway=$(az containerapp show -g "$RESOURCE_GROUP" -n gateway \
+            --query properties.configuration.ingress.fqdn -o tsv 2>/dev/null || true)
+          account=$(az storage account list -g "$RESOURCE_GROUP" \
+            --query "[?starts_with(name, 'stcgfe')].name | [0]" -o tsv)
+          if [ -z "$gateway" ] || [ -z "$account" ]; then
+            echo "::error::The Gateway or the static site does not exist. Run 'Azure dev environment' with apply first."
+            exit 1
+          fi
+          site=$(az storage account show -g "$RESOURCE_GROUP" -n "$account" \
+            --query primaryEndpoints.web -o tsv)
+          {
+            echo "gateway=https://$gateway"
+            echo "account=$account"
+            echo "site=${site%/}"
+          } >> "$GITHUB_OUTPUT"
+
+      # The Gateway address is compiled into the bundle, so the build runs here and not in the
+      # frontend's own pipeline. Lint and tests belong to that pipeline.
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ steps.env.outputs.gateway }}/api/v1
+        run: |
+          npm install --global pnpm@10.33.0
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Publish to the static site
+        env:
+          ACCOUNT: ${{ steps.env.outputs.account }}
+        run: |
+          # \$web is the literal name of the static website container
+          key=$(az storage account keys list -g "$RESOURCE_GROUP" -n "$ACCOUNT" --query '[0].value' -o tsv)
+          echo "::add-mask::$key"
+          az storage blob delete-batch --account-name "$ACCOUNT" --account-key "$key" \
+            --source "\$web" --only-show-errors > /dev/null
+          az storage blob upload-batch --account-name "$ACCOUNT" --account-key "$key" \
+            --destination "\$web" --source frontend/dist --overwrite --no-progress --only-show-errors > /dev/null
+
+      - name: Verify the site and the Gateway's CORS
+        env:
+          SITE: ${{ steps.env.outputs.site }}
+          GATEWAY: ${{ steps.env.outputs.gateway }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' "$SITE/")
+          [ "$status" = 200 ] || { echo "::error::The site answered HTTP $status"; exit 1; }
+          curl -s "$SITE/some/deep/link" | grep -q 'id="root"' \
+            || { echo "::error::A deep link does not return the application shell"; exit 1; }
+          allowed=$(curl -s -D - -o /dev/null -X OPTIONS "$GATEWAY/api/v1/auth/login" \
+            -H "Origin: $SITE" -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type' | tr -d '\r' \
+            | awk -F': ' 'tolower($1) == "access-control-allow-origin" { print $2 }')
+          [ "$allowed" = "$SITE" ] \
+            || { echo "::error::The Gateway does not allow the origin $SITE. Run the apply again so the Gateway picks it up."; exit 1; }
+
+      - name: Summary
+        env:
+          SITE: ${{ steps.env.outputs.site }}
+          GATEWAY: ${{ steps.env.outputs.gateway }}
+          FRONTEND_REF: ${{ inputs.frontend_ref }}
+        run: |
+          {
+            echo "### Frontend published"
+            echo ""
+            echo "- Site: $SITE"
+            echo "- Gateway: $GATEWAY"
+            echo "- Frontend ref: $FRONTEND_REF"
+            echo "- CORS: the Gateway allows the site origin"
+          } >> "$GITHUB_STEP_SUMMARY"
