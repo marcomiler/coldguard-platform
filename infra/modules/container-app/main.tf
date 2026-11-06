@@ -11,7 +11,10 @@ resource "azurerm_container_app" "this" {
   container_app_environment_id = var.environment_id
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
-  tags                         = var.tags
+  # Without a profile the platform treats the app as an "express" app, which rejects TCP ingress and
+  # Key Vault secret references.
+  workload_profile_name = "Consumption"
+  tags                  = var.tags
 
   identity {
     type         = "UserAssigned"
