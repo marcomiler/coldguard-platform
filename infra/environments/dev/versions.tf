@@ -33,7 +33,9 @@ provider "azapi" {}
 provider "azurerm" {
   features {
     key_vault {
-      purge_soft_delete_on_destroy    = true
+      # The pipeline identity cannot purge (subscription-level permission); a soft-deleted vault is free
+      # and the name carries a random suffix, so a new environment never collides with it.
+      purge_soft_delete_on_destroy    = false
       recover_soft_deleted_key_vaults = false
     }
   }
