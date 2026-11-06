@@ -89,6 +89,8 @@ jobs:
 
   build-and-test:
     name: Build and test
+    # Repository variable CI_RUN_TESTS: set it to "false" to skip the tests (unset or any other value runs them).
+    if: ${{ vars.CI_RUN_TESTS != 'false' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -164,6 +166,8 @@ jobs:
 
   static-analysis:
     name: Static analysis (SpotBugs)
+    # Repository variable CI_RUN_STATIC_ANALYSIS: set it to "false" to skip SpotBugs (unset or any other value runs it).
+    if: ${{ vars.CI_RUN_STATIC_ANALYSIS != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -224,7 +228,14 @@ jobs:
   compose-smoke:
     name: Compose end-to-end smoke
     # Slow (builds every image and runs the whole stack): only after merging or on demand.
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master')
+    # A skipped test job (CI_RUN_TESTS=false) does not block it; a failed one does.
+    if: >-
+      ${{ !cancelled()
+      && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
+      && needs.lint.result == 'success'
+      && needs.secrets-scan.result == 'success'
+      && contains(fromJSON('["success","skipped"]'), needs.build-and-test.result)
+      && needs.docker-build.result == 'success' }}
     needs: [lint, secrets-scan, build-and-test, docker-build]
     runs-on: ubuntu-latest
     timeout-minutes: 30

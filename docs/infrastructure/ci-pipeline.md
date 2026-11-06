@@ -54,6 +54,17 @@ Cada excepción es acotada y tiene una razón; ninguna desactiva un control comp
 | SpotBugs | Clases generadas por protoc | No es código escrito a mano |
 | gitleaks | Una contraseña ficticia en una prueba | La prueba verifica que esa contraseña nunca llegue a los registros |
 
+### Interruptores de las etapas costosas
+
+Dos variables del repositorio permiten omitir etapas sin modificar el flujo de trabajo, por ejemplo al validar solo un cambio de infraestructura:
+
+| Variable | Etapa que controla | Comportamiento |
+|---|---|---|
+| `CI_RUN_TESTS` | Compilación y pruebas (unitarias e integración) | Con el valor `false` se omite; sin definir, o con cualquier otro valor, se ejecuta |
+| `CI_RUN_STATIC_ANALYSIS` | Análisis estático (SpotBugs) | Con el valor `false` se omite; sin definir, o con cualquier otro valor, se ejecuta |
+
+Una etapa omitida aparece como "Skipped" y no bloquea la fusión ni la publicación de imágenes; una etapa que se ejecuta y falla sí las bloquea. El valor por omisión es ejecutarlo todo, de modo que olvidar la variable nunca debilita el control. El formato, los linters, el análisis de secretos y la construcción de imágenes no tienen interruptor.
+
 ## 3. Análisis de dependencias
 
 Dependabot propone cada semana actualizaciones de las dependencias Maven, de las acciones de GitHub y
