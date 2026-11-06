@@ -26,6 +26,12 @@ variable "github_repository" {
   }
 }
 
+variable "github_oidc_repository" {
+  description = "Repository part of the OIDC subject when GitHub issues immutable subjects, as owner@ownerId/name@repoId. Leave null for the classic owner/name form."
+  type        = string
+  default     = null
+}
+
 variable "github_environment" {
   description = "Protected GitHub environment whose approval gates every apply and destroy."
   type        = string
